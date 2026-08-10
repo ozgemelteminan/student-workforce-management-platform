@@ -41,6 +41,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Feedback> Feedback => Set<Feedback>();
     public DbSet<TaskTemplate> TaskTemplates => Set<TaskTemplate>();
     public DbSet<RecurringTask> RecurringTasks => Set<RecurringTask>();
+    public DbSet<RecurringTaskOccurrence> RecurringTaskOccurrences => Set<RecurringTaskOccurrence>();
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();

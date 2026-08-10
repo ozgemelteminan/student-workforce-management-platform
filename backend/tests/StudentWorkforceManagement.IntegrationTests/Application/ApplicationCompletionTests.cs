@@ -40,7 +40,8 @@ public sealed class ApplicationCompletionTests
         Assert.Equal("raw-invite-token", created.RawToken);
         Assert.Equal(tokenGenerator.HashToken("raw-invite-token"), invitation.TokenHash);
         Assert.DoesNotContain("raw-invite-token", invitation.TokenHash);
-        Assert.Equal("raw-invite-token", email.LastMessage?.TemplateData["invitationToken"]);
+        Assert.Equal("raw-invite-token", email.LastMessage?.SecretTemplateData?["invitationToken"]);
+        Assert.False(email.LastMessage?.TemplateData.ContainsKey("invitationToken"));
 
         await handler.Handle(new AcceptInvitationCommand("raw-invite-token", "Password1", "Ada Lovelace", "Ada", "Lovelace", "Computer Engineering"), CancellationToken.None);
         await context.SaveChangesAsync();
@@ -97,7 +98,8 @@ public sealed class ApplicationCompletionTests
 
         Assert.Equal(tokenGenerator.HashToken("reset-token"), resetToken.TokenHash);
         Assert.DoesNotContain("reset-token", resetToken.TokenHash, StringComparison.Ordinal);
-        Assert.Equal("reset-token", email.LastMessage?.TemplateData["resetToken"]);
+        Assert.Equal("reset-token", email.LastMessage?.SecretTemplateData?["resetToken"]);
+        Assert.False(email.LastMessage?.TemplateData.ContainsKey("resetToken"));
 
         var result = await handler.Handle(new ResetPasswordCommand("reset-token", "NewPass1"), CancellationToken.None);
         await context.SaveChangesAsync();

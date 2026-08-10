@@ -6,6 +6,7 @@ using StudentWorkforceManagement.Application.Common.Behaviors;
 using StudentWorkforceManagement.Application.Common.Events;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
+using StudentWorkforceManagement.Application.RecurringTasks.Services;
 using StudentWorkforceManagement.Application.Tasks.Services;
 
 namespace StudentWorkforceManagement.Application;
@@ -29,10 +30,12 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<INotificationIntentService, NotificationIntentService>();
         services.AddScoped<ITaskStateMachine, TaskStateMachine>();
+        services.AddScoped<ITaskCreationService, TaskCreationService>();
         services.AddScoped<ITaskWorkloadService, TaskWorkloadService>();
         services.AddScoped<ITaskDependencyService, TaskDependencyService>();
         services.AddScoped<IAssignmentRecommendationService, AssignmentRecommendationService>();
         services.AddScoped<ISkillMatchingService, SkillMatchingService>();
+        services.AddScoped<IRecurringTaskGenerationService, RecurringTaskGenerationService>();
 
         return services;
     }

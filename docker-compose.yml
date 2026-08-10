@@ -9,8 +9,20 @@ services:
       REDIS_CONNECTION_STRING: redis:6379
       DISPLAY_TIMEZONE: Europe/Istanbul
       MAX_FILE_SIZE_BYTES: 1073741824
+      Jwt__Issuer: StudentWorkforceManagement
+      Jwt__Audience: StudentWorkforceManagement.Api
+      Jwt__SigningKey: DEV_ONLY_SIGNING_KEY_0123456789_32_CHARS_MIN
+      Email__Provider: Development
+      DataProtection__KeysPath: /app/storage/keys
+      Storage__Provider: Local
+      Storage__LocalRootPath: /app/storage/local
+      Storage__SignedUrlLifetimeMinutes: 15
+      BackgroundJobs__HangfireSchemaName: hangfire
     ports:
       - "8080:8080"
+    volumes:
+      - api_local_storage:/app/storage/local
+      - api_data_protection_keys:/app/storage/keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,3 +60,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  api_local_storage:
+  api_data_protection_keys:

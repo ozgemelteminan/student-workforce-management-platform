@@ -131,8 +131,9 @@ public sealed class PasswordAuthContractHandler(
             normalizedEmail,
             "Reset your Student Workforce password",
             "auth.password-reset",
-            new Dictionary<string, string> { ["resetToken"] = rawToken, ["userId"] = user.Id.ToString("N") },
-            $"password-reset:{resetToken.Id:N}"), cancellationToken);
+            new Dictionary<string, string> { ["userId"] = user.Id.ToString("N") },
+            $"password-reset:{resetToken.Id:N}",
+            new Dictionary<string, string> { ["resetToken"] = rawToken }), cancellationToken);
         await auditService.RecordAsync("PasswordResetRequested", "User", user.Id, cancellationToken: cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         return new PasswordResetRequestDto(normalizedEmail, resetToken.ExpiresAt);

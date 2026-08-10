@@ -16,4 +16,5 @@ public sealed class RecurringTask : AuditableEntity, IHasConcurrencyToken
     public Guid CreatedById { get; set; }
     public User? CreatedBy { get; set; }
     public Guid ConcurrencyToken { get; set; }
+    public ICollection<RecurringTaskOccurrence> Occurrences { get; set; } = new List<RecurringTaskOccurrence>();
 }

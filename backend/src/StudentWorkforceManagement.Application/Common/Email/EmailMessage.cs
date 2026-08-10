@@ -5,4 +5,5 @@ public sealed record EmailMessage(
     string Subject,
     string TemplateKey,
     IReadOnlyDictionary<string, string> TemplateData,
-    string IdempotencyKey);
+    string IdempotencyKey,
+    IReadOnlyDictionary<string, string>? SecretTemplateData = null);

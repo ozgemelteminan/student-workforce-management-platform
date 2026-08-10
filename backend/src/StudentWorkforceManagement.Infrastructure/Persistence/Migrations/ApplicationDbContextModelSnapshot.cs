@@ -368,6 +368,17 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("TemplateDataJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}");
+
                     b.Property<string>("TemplateKey")
                         .IsRequired()
                         .HasMaxLength(160)
@@ -841,6 +852,64 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.HasIndex("TemplateId");
 
                     b.ToTable("RecurringTasks", (string)null);
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RecurringTaskOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("GeneratedTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RecurringTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ScheduledRunAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("GeneratedTaskId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("RecurringTaskId", "ScheduledRunAt")
+                        .IsUnique();
+
+                    b.ToTable("RecurringTaskOccurrences", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RecurringTaskOccurrences_Attempts", "\"Attempts\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RefreshToken", b =>
@@ -2098,6 +2167,24 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RecurringTaskOccurrence", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Task", "GeneratedTask")
+                        .WithMany()
+                        .HasForeignKey("GeneratedTaskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.RecurringTask", "RecurringTask")
+                        .WithMany("Occurrences")
+                        .HasForeignKey("RecurringTaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GeneratedTask");
+
+                    b.Navigation("RecurringTask");
+                });
+
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("StudentWorkforceManagement.Domain.Entities.Session", "Session")
@@ -2482,6 +2569,11 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MarketplaceListing", b =>
                 {
                     b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RecurringTask", b =>
+                {
+                    b.Navigation("Occurrences");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Role", b =>

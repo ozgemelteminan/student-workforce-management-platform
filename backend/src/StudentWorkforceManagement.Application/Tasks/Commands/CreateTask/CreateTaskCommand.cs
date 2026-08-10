@@ -1,12 +1,9 @@
 using FluentValidation;
 using MediatR;
-using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Security;
-using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Tasks.DTOs;
+using StudentWorkforceManagement.Application.Tasks.Services;
 using StudentWorkforceManagement.Domain.Enums;
-using TaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
-using DomainTask = StudentWorkforceManagement.Domain.Entities.Task;
 
 namespace StudentWorkforceManagement.Application.Tasks.Commands.CreateTask;
 
@@ -39,31 +36,22 @@ public sealed class CreateTaskCommandValidator : AbstractValidator<CreateTaskCom
     }
 }
 
-public sealed class CreateTaskCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IAuditService auditService)
+public sealed class CreateTaskCommandHandler(ICurrentUserService currentUser, ITaskCreationService taskCreation)
     : IRequestHandler<CreateTaskCommand, TaskDto>
 {
-    public async System.Threading.Tasks.Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
+    public System.Threading.Tasks.Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
     {
-        var task = new DomainTask
-        {
-            Id = Guid.NewGuid(),
-            Title = request.Title.Trim(),
-            Description = request.Description,
-            CategoryId = request.CategoryId,
-            SemesterId = request.SemesterId,
-            Priority = request.Priority,
-            Difficulty = request.Difficulty,
-            Status = TaskStatus.ASSIGNED,
-            CreatedById = currentUser.RequireUserId(),
-            StartDate = request.StartDate,
-            Deadline = request.Deadline.ToUniversalTime(),
-            EstimatedDurationMinutes = request.EstimatedDurationMinutes
-        };
-
-        dbContext.Tasks.Add(task);
-        await auditService.RecordAsync("TaskCreated", nameof(DomainTask), task.Id, newValue: task.Title, cancellationToken: cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return TaskMappings.ToDto(task);
+        return taskCreation.CreateAsync(
+            request.Title,
+            request.Description,
+            request.CategoryId,
+            request.SemesterId,
+            request.Priority,
+            request.Difficulty,
+            request.StartDate,
+            request.Deadline,
+            request.EstimatedDurationMinutes,
+            currentUser.RequireUserId(),
+            cancellationToken);
     }
 }

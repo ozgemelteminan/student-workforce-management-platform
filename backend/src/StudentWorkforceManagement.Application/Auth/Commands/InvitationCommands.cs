@@ -225,8 +225,9 @@ public sealed class InvitationCommandHandler(
             email,
             "Your Student Workforce invitation",
             templateKey,
-            new Dictionary<string, string> { ["invitationToken"] = rawToken, ["invitationId"] = invitationId.ToString("N") },
-            $"invitation:{invitationId:N}"), cancellationToken);
+            new Dictionary<string, string> { ["invitationId"] = invitationId.ToString("N") },
+            $"invitation:{invitationId:N}",
+            new Dictionary<string, string> { ["invitationToken"] = rawToken }), cancellationToken);
     }
 
     private static InvitationDto ToDto(Invitation invitation)

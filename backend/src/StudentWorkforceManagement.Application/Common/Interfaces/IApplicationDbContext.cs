@@ -25,6 +25,7 @@ using DepartmentFile = StudentWorkforceManagement.Domain.Entities.DepartmentFile
 using Feedback = StudentWorkforceManagement.Domain.Entities.Feedback;
 using FileFolder = StudentWorkforceManagement.Domain.Entities.FileFolder;
 using Invitation = StudentWorkforceManagement.Domain.Entities.Invitation;
+using RecurringTaskOccurrence = StudentWorkforceManagement.Domain.Entities.RecurringTaskOccurrence;
 using RecurringTask = StudentWorkforceManagement.Domain.Entities.RecurringTask;
 using RefreshToken = StudentWorkforceManagement.Domain.Entities.RefreshToken;
 using PasswordResetToken = StudentWorkforceManagement.Domain.Entities.PasswordResetToken;
@@ -73,6 +74,7 @@ public interface IApplicationDbContext
     DbSet<StudentWorkforceManagement.Domain.Entities.Feedback> Feedback { get; }
     DbSet<TaskTemplate> TaskTemplates { get; }
     DbSet<RecurringTask> RecurringTasks { get; }
+    DbSet<RecurringTaskOccurrence> RecurringTaskOccurrences { get; }
     DbSet<EmailDelivery> EmailDeliveries { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<SystemSetting> SystemSettings { get; }

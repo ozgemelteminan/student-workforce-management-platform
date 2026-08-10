@@ -8,7 +8,9 @@ public sealed class EmailDelivery : AuditableEntity
 {
     public string IdempotencyKey { get; set; } = string.Empty;
     public string RecipientEmail { get; set; } = string.Empty;
+    public string Subject { get; set; } = string.Empty;
     public string TemplateKey { get; set; } = string.Empty;
+    public string TemplateDataJson { get; set; } = "{}";
     public EmailDeliveryStatus Status { get; set; }
     public int Attempts { get; set; }
     public string? ProviderName { get; set; }

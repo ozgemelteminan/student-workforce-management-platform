@@ -14,4 +14,3 @@ coverage/
 *.user
 *.suo
 *.log
-backend/src/StudentWorkforceManagement.Infrastructure/Persistence/Migrations/*.Designer.cs

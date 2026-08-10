@@ -2,5 +2,5 @@ namespace StudentWorkforceManagement.Domain.Common;
 
 public interface IHasConcurrencyToken
 {
-    byte[] RowVersion { get; set; }
+    Guid ConcurrencyToken { get; set; }
 }

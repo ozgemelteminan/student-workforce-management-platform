@@ -1,16 +1,27 @@
 using StudentWorkforceManagement.Domain.Common;
 using StudentWorkforceManagement.Domain.Enums;
+using StudentWorkforceManagement.Domain.ValueObjects;
 
 namespace StudentWorkforceManagement.Domain.Entities;
 
-public sealed class Student : Entity, ISoftDeletable, IHasConcurrencyToken
+public sealed class Student : AuditableEntity, ISoftDeletable, IHasConcurrencyToken
 {
     public Guid UserId { get; set; }
+    public User? User { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
+    public bool IsActive { get; set; } = true;
     public DateTimeOffset? DeletedAt { get; set; }
-    public byte[] RowVersion { get; set; } = [];
+    public Guid ConcurrencyToken { get; set; }
+
+    public ICollection<StudentSkill> Skills { get; set; } = new List<StudentSkill>();
+    public ICollection<CourseSchedule> CourseSchedules { get; set; } = new List<CourseSchedule>();
+    public ICollection<Availability> Availability { get; set; } = new List<Availability>();
+    public ICollection<TaskAssignmentHistory> AssignmentHistory { get; set; } = new List<TaskAssignmentHistory>();
+    public ICollection<TaskSubmission> Submissions { get; set; } = new List<TaskSubmission>();
+    public ICollection<TaskRequest> Requests { get; set; } = new List<TaskRequest>();
+    public ICollection<MarketplaceClaim> MarketplaceClaims { get; set; } = new List<MarketplaceClaim>();
+    public ICollection<Feedback> FeedbackReceived { get; set; } = new List<Feedback>();
 }

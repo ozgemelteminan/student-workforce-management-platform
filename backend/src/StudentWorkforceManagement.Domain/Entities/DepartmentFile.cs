@@ -1,18 +1,17 @@
 using StudentWorkforceManagement.Domain.Common;
 using StudentWorkforceManagement.Domain.Enums;
+using StudentWorkforceManagement.Domain.ValueObjects;
 
 namespace StudentWorkforceManagement.Domain.Entities;
 
-public sealed class DepartmentFile : Entity, ISoftDeletable
+public sealed class DepartmentFile : AuditableEntity, ISoftDeletable
 {
     public Guid? FolderId { get; set; }
+    public FileFolder? Folder { get; set; }
     public Guid UploadedById { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string StorageKey { get; set; } = string.Empty;
-    public long FileSize { get; set; }
-    public string MimeType { get; set; } = string.Empty;
-    public string FileExtension { get; set; } = string.Empty;
-    public string? ContentHash { get; set; }
+    public User? UploadedBy { get; set; }
+    public FileMetadata File { get; set; } = new();
     public FileStatus FileStatus { get; set; }
+    public DateTimeOffset? ConfirmedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 }

@@ -1,0 +1,102 @@
+using FluentValidation;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using StudentWorkforceManagement.Application.Common.Exceptions;
+using StudentWorkforceManagement.Application.Common.Interfaces;
+using StudentWorkforceManagement.Application.Common.Security;
+using StudentWorkforceManagement.Application.Skills.DTOs;
+using Announcement = StudentWorkforceManagement.Domain.Entities.Announcement;
+using AuditLog = StudentWorkforceManagement.Domain.Entities.AuditLog;
+using AvailabilityEntity = StudentWorkforceManagement.Domain.Entities.Availability;
+using Category = StudentWorkforceManagement.Domain.Entities.Category;
+using CourseSchedule = StudentWorkforceManagement.Domain.Entities.CourseSchedule;
+using EmailDelivery = StudentWorkforceManagement.Domain.Entities.EmailDelivery;
+using MarketplaceClaim = StudentWorkforceManagement.Domain.Entities.MarketplaceClaim;
+using MarketplaceListing = StudentWorkforceManagement.Domain.Entities.MarketplaceListing;
+using Notification = StudentWorkforceManagement.Domain.Entities.Notification;
+using NotificationPreference = StudentWorkforceManagement.Domain.Entities.NotificationPreference;
+using Semester = StudentWorkforceManagement.Domain.Entities.Semester;
+using Skill = StudentWorkforceManagement.Domain.Entities.Skill;
+using StudentSkill = StudentWorkforceManagement.Domain.Entities.StudentSkill;
+using SubmissionVersion = StudentWorkforceManagement.Domain.Entities.SubmissionVersion;
+using SystemSetting = StudentWorkforceManagement.Domain.Entities.SystemSetting;
+using TaskAssignmentHistory = StudentWorkforceManagement.Domain.Entities.TaskAssignmentHistory;
+using TaskChecklistItem = StudentWorkforceManagement.Domain.Entities.TaskChecklistItem;
+using TaskComment = StudentWorkforceManagement.Domain.Entities.TaskComment;
+using TaskDependency = StudentWorkforceManagement.Domain.Entities.TaskDependency;
+using TaskRequest = StudentWorkforceManagement.Domain.Entities.TaskRequest;
+using TaskReview = StudentWorkforceManagement.Domain.Entities.TaskReview;
+using TaskSubmission = StudentWorkforceManagement.Domain.Entities.TaskSubmission;
+using DepartmentFile = StudentWorkforceManagement.Domain.Entities.DepartmentFile;
+using Feedback = StudentWorkforceManagement.Domain.Entities.Feedback;
+using FileFolder = StudentWorkforceManagement.Domain.Entities.FileFolder;
+using Invitation = StudentWorkforceManagement.Domain.Entities.Invitation;
+using RecurringTask = StudentWorkforceManagement.Domain.Entities.RecurringTask;
+using RefreshToken = StudentWorkforceManagement.Domain.Entities.RefreshToken;
+using Role = StudentWorkforceManagement.Domain.Entities.Role;
+using Session = StudentWorkforceManagement.Domain.Entities.Session;
+using Student = StudentWorkforceManagement.Domain.Entities.Student;
+using TaskRequiredSkill = StudentWorkforceManagement.Domain.Entities.TaskRequiredSkill;
+using TaskTemplate = StudentWorkforceManagement.Domain.Entities.TaskTemplate;
+using User = StudentWorkforceManagement.Domain.Entities.User;
+using StudentWorkforceManagement.Domain.Enums;
+
+namespace StudentWorkforceManagement.Application.Skills.Commands;
+
+public sealed record CreateSkillCommand(string Name, string? Description) : IRequest<SkillDto>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
+}
+public sealed record UpsertStudentSkillCommand(Guid StudentId, Guid SkillId, SkillLevel Level) : IRequest<StudentSkillDto>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AnyRole;
+}
+
+public sealed class CreateSkillCommandValidator : AbstractValidator<CreateSkillCommand>
+{
+    public CreateSkillCommandValidator()
+    {
+        RuleFor(command => command.Name).NotEmpty().MaximumLength(120);
+        RuleFor(command => command.Description).MaximumLength(1000);
+    }
+}
+public sealed class UpsertStudentSkillCommandValidator : AbstractValidator<UpsertStudentSkillCommand>
+{
+    public UpsertStudentSkillCommandValidator()
+    {
+        RuleFor(command => command.StudentId).NotEmpty();
+        RuleFor(command => command.SkillId).NotEmpty();
+        RuleFor(command => command.Level).IsInEnum();
+    }
+}
+
+public sealed class SkillCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser)
+    : IRequestHandler<CreateSkillCommand, SkillDto>, IRequestHandler<UpsertStudentSkillCommand, StudentSkillDto>
+{
+    public async System.Threading.Tasks.Task<SkillDto> Handle(CreateSkillCommand request, CancellationToken cancellationToken)
+    {
+        var skill = new Skill { Id = Guid.NewGuid(), Name = request.Name.Trim(), Description = request.Description };
+        dbContext.Skills.Add(skill);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new SkillDto(skill.Id, skill.Name, skill.Description);
+    }
+
+    public async System.Threading.Tasks.Task<StudentSkillDto> Handle(UpsertStudentSkillCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUser.IsInRole(UserRole.STUDENT) && currentUser.StudentId != request.StudentId)
+        {
+            throw new ForbiddenException("Students may update only their own skills.");
+        }
+
+        var entity = await dbContext.StudentSkills.SingleOrDefaultAsync(skill => skill.StudentId == request.StudentId && skill.SkillId == request.SkillId, cancellationToken);
+        if (entity is null)
+        {
+            entity = new StudentSkill { Id = Guid.NewGuid(), StudentId = request.StudentId, SkillId = request.SkillId };
+            dbContext.StudentSkills.Add(entity);
+        }
+
+        entity.Level = request.Level;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return new StudentSkillDto(entity.Id, entity.StudentId, entity.SkillId, entity.Level);
+    }
+}

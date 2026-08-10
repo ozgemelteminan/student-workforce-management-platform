@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Domain.Entities;
 using DomainTask = StudentWorkforceManagement.Domain.Entities.Task;
 
 namespace StudentWorkforceManagement.Infrastructure.Persistence;
 
-public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IApplicationDbContext
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
@@ -41,6 +43,24 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+
+
+
+    public async Task<IApplicationTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        return new EfApplicationTransaction(transaction);
+    }
+
+    private sealed class EfApplicationTransaction(IDbContextTransaction transaction) : IApplicationTransaction
+    {
+        public System.Threading.Tasks.Task CommitAsync(CancellationToken cancellationToken = default) => transaction.CommitAsync(cancellationToken);
+
+        public System.Threading.Tasks.Task RollbackAsync(CancellationToken cancellationToken = default) => transaction.RollbackAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+    }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

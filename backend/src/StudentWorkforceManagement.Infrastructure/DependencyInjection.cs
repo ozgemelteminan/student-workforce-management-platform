@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Infrastructure.Persistence;
 using StudentWorkforceManagement.Infrastructure.Persistence.Interceptors;
@@ -27,6 +28,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<AuditableEntityInterceptor>(),
                 serviceProvider.GetRequiredService<ConcurrencyTokenInterceptor>());
         });
+        services.AddScoped<IApplicationDbContext>(serviceProvider => serviceProvider.GetRequiredService<ApplicationDbContext>());
 
         return services;
     }

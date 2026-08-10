@@ -27,6 +27,7 @@ using FileFolder = StudentWorkforceManagement.Domain.Entities.FileFolder;
 using Invitation = StudentWorkforceManagement.Domain.Entities.Invitation;
 using RecurringTask = StudentWorkforceManagement.Domain.Entities.RecurringTask;
 using RefreshToken = StudentWorkforceManagement.Domain.Entities.RefreshToken;
+using PasswordResetToken = StudentWorkforceManagement.Domain.Entities.PasswordResetToken;
 using Role = StudentWorkforceManagement.Domain.Entities.Role;
 using Session = StudentWorkforceManagement.Domain.Entities.Session;
 using Student = StudentWorkforceManagement.Domain.Entities.Student;
@@ -45,6 +46,7 @@ public interface IApplicationDbContext
     DbSet<Invitation> Invitations { get; }
     DbSet<Session> Sessions { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<PasswordResetToken> PasswordResetTokens { get; }
     DbSet<Skill> Skills { get; }
     DbSet<StudentSkill> StudentSkills { get; }
     DbSet<Category> Categories { get; }
@@ -68,7 +70,7 @@ public interface IApplicationDbContext
     DbSet<Announcement> Announcements { get; }
     DbSet<Notification> Notifications { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
-    DbSet<Feedback> Feedback { get; }
+    DbSet<StudentWorkforceManagement.Domain.Entities.Feedback> Feedback { get; }
     DbSet<TaskTemplate> TaskTemplates { get; }
     DbSet<RecurringTask> RecurringTasks { get; }
     DbSet<EmailDelivery> EmailDeliveries { get; }

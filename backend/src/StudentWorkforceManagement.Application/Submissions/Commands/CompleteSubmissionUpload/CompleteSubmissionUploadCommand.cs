@@ -5,80 +5,58 @@ using StudentWorkforceManagement.Application.Common.Behaviors;
 using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Security;
+using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
+using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Application.Submissions.DTOs;
-using Announcement = StudentWorkforceManagement.Domain.Entities.Announcement;
-using AuditLog = StudentWorkforceManagement.Domain.Entities.AuditLog;
-using AvailabilityEntity = StudentWorkforceManagement.Domain.Entities.Availability;
-using Category = StudentWorkforceManagement.Domain.Entities.Category;
-using CourseSchedule = StudentWorkforceManagement.Domain.Entities.CourseSchedule;
-using EmailDelivery = StudentWorkforceManagement.Domain.Entities.EmailDelivery;
-using MarketplaceClaim = StudentWorkforceManagement.Domain.Entities.MarketplaceClaim;
-using MarketplaceListing = StudentWorkforceManagement.Domain.Entities.MarketplaceListing;
-using Notification = StudentWorkforceManagement.Domain.Entities.Notification;
-using NotificationPreference = StudentWorkforceManagement.Domain.Entities.NotificationPreference;
-using Semester = StudentWorkforceManagement.Domain.Entities.Semester;
-using Skill = StudentWorkforceManagement.Domain.Entities.Skill;
-using StudentSkill = StudentWorkforceManagement.Domain.Entities.StudentSkill;
-using SubmissionVersion = StudentWorkforceManagement.Domain.Entities.SubmissionVersion;
-using SystemSetting = StudentWorkforceManagement.Domain.Entities.SystemSetting;
-using TaskAssignmentHistory = StudentWorkforceManagement.Domain.Entities.TaskAssignmentHistory;
-using TaskChecklistItem = StudentWorkforceManagement.Domain.Entities.TaskChecklistItem;
-using TaskComment = StudentWorkforceManagement.Domain.Entities.TaskComment;
-using TaskDependency = StudentWorkforceManagement.Domain.Entities.TaskDependency;
-using TaskRequest = StudentWorkforceManagement.Domain.Entities.TaskRequest;
-using TaskReview = StudentWorkforceManagement.Domain.Entities.TaskReview;
-using TaskSubmission = StudentWorkforceManagement.Domain.Entities.TaskSubmission;
-using DepartmentFile = StudentWorkforceManagement.Domain.Entities.DepartmentFile;
-using Feedback = StudentWorkforceManagement.Domain.Entities.Feedback;
-using FileFolder = StudentWorkforceManagement.Domain.Entities.FileFolder;
-using Invitation = StudentWorkforceManagement.Domain.Entities.Invitation;
-using RecurringTask = StudentWorkforceManagement.Domain.Entities.RecurringTask;
-using RefreshToken = StudentWorkforceManagement.Domain.Entities.RefreshToken;
-using Role = StudentWorkforceManagement.Domain.Entities.Role;
-using Session = StudentWorkforceManagement.Domain.Entities.Session;
-using Student = StudentWorkforceManagement.Domain.Entities.Student;
-using TaskRequiredSkill = StudentWorkforceManagement.Domain.Entities.TaskRequiredSkill;
-using TaskTemplate = StudentWorkforceManagement.Domain.Entities.TaskTemplate;
-using User = StudentWorkforceManagement.Domain.Entities.User;
+using StudentWorkforceManagement.Domain.Entities;
 using StudentWorkforceManagement.Domain.Enums;
-using TaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 using StudentWorkforceManagement.Domain.ValueObjects;
+using TaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
 namespace StudentWorkforceManagement.Application.Submissions.Commands.CompleteSubmissionUpload;
 
-public sealed record CompleteSubmissionUploadCommand(
+public sealed record InitiateSubmissionUploadCommand(
     Guid TaskId,
     string FileName,
-    string StorageKey,
     long FileSize,
     string MimeType,
     string FileExtension,
-    string? ContentHash) : IRequest<SubmissionVersionDto>, IAuthorizableRequest, ITransactionalRequest
+    string? ContentHash) : IRequest<SubmissionUploadIntentDto>, IAuthorizableRequest, ITransactionalRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.Students;
 }
 
-public sealed class CompleteSubmissionUploadCommandValidator : AbstractValidator<CompleteSubmissionUploadCommand>
+public sealed record CompleteSubmissionUploadCommand(Guid SubmissionVersionId) : IRequest<SubmissionVersionDto>, IAuthorizableRequest, ITransactionalRequest
 {
-    public const long MaxFileSizeBytes = 1024L * 1024L * 1024L;
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.Students;
+}
 
-    public CompleteSubmissionUploadCommandValidator()
+public sealed class InitiateSubmissionUploadCommandValidator : AbstractValidator<InitiateSubmissionUploadCommand>
+{
+    public InitiateSubmissionUploadCommandValidator()
     {
         RuleFor(command => command.TaskId).NotEmpty();
         RuleFor(command => command.FileName).NotEmpty().MaximumLength(255);
-        RuleFor(command => command.StorageKey).NotEmpty().MaximumLength(1024);
-        RuleFor(command => command.FileSize).InclusiveBetween(1, MaxFileSizeBytes);
+        RuleFor(command => command.FileSize).InclusiveBetween(1, FilePolicy.MaxFileSizeBytes);
         RuleFor(command => command.MimeType).NotEmpty().MaximumLength(150);
         RuleFor(command => command.FileExtension).NotEmpty().MaximumLength(20);
         RuleFor(command => command.ContentHash).MaximumLength(128);
     }
 }
 
-public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IUtcClock clock)
-    : IRequestHandler<CompleteSubmissionUploadCommand, SubmissionVersionDto>
+public sealed class CompleteSubmissionUploadCommandValidator : AbstractValidator<CompleteSubmissionUploadCommand>
 {
-    public async System.Threading.Tasks.Task<SubmissionVersionDto> Handle(CompleteSubmissionUploadCommand request, CancellationToken cancellationToken)
+    public CompleteSubmissionUploadCommandValidator()
+    {
+        RuleFor(command => command.SubmissionVersionId).NotEmpty();
+    }
+}
+
+public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IFileStorage storage, IUtcClock clock)
+    : IRequestHandler<InitiateSubmissionUploadCommand, SubmissionUploadIntentDto>, IRequestHandler<CompleteSubmissionUploadCommand, SubmissionVersionDto>
+{
+    public async System.Threading.Tasks.Task<SubmissionUploadIntentDto> Handle(InitiateSubmissionUploadCommand request, CancellationToken cancellationToken)
     {
         var studentId = currentUser.RequireStudentId();
         var task = await dbContext.Tasks.SingleOrDefaultAsync(entity => entity.Id == request.TaskId, cancellationToken)
@@ -92,6 +70,8 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             throw new ConflictException("Submissions are not allowed for cancelled or completed tasks.");
         }
 
+        FilePolicy.ValidateSize(request.FileSize);
+        var extension = FilePolicy.NormalizeExtension(request.FileExtension);
         var submission = await dbContext.TaskSubmissions.SingleOrDefaultAsync(entity => entity.TaskId == request.TaskId && entity.SubmittedById == studentId, cancellationToken);
         if (submission is null)
         {
@@ -110,7 +90,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             .Select(version => (int?)version.VersionNumber)
             .MaxAsync(cancellationToken) ?? 0;
 
-        var now = clock.UtcNow;
+        var storageKey = $"task-submissions/{request.TaskId:N}/{Guid.NewGuid():N}{extension}";
         var version = new SubmissionVersion
         {
             Id = Guid.NewGuid(),
@@ -119,18 +99,54 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             File = new FileMetadata
             {
                 FileName = request.FileName.Trim(),
-                StorageKey = request.StorageKey,
+                StorageKey = storageKey,
                 FileSize = request.FileSize,
-                MimeType = request.MimeType,
-                FileExtension = request.FileExtension,
+                MimeType = request.MimeType.Trim(),
+                FileExtension = extension,
                 ContentHash = request.ContentHash
             },
-            FileStatus = FileStatus.CONFIRMED,
+            FileStatus = FileStatus.UPLOAD_PENDING,
             UploadedById = studentId,
-            UploadedAt = now,
-            ConfirmedAt = now
+            UploadedAt = clock.UtcNow
         };
         dbContext.SubmissionVersions.Add(version);
+        return new SubmissionUploadIntentDto(version.Id, submission.Id, version.VersionNumber, storageKey, version.File.FileName, version.File.FileSize, version.File.MimeType, version.File.FileExtension, version.FileStatus);
+    }
+
+    public async System.Threading.Tasks.Task<SubmissionVersionDto> Handle(CompleteSubmissionUploadCommand request, CancellationToken cancellationToken)
+    {
+        var studentId = currentUser.RequireStudentId();
+        var version = await dbContext.SubmissionVersions.Include(item => item.TaskSubmission).SingleOrDefaultAsync(item => item.Id == request.SubmissionVersionId, cancellationToken)
+            ?? throw new NotFoundException("SubmissionVersion", request.SubmissionVersionId);
+        if (version.TaskSubmission?.SubmittedById != studentId)
+        {
+            throw new ForbiddenException("Students may complete only their own uploads.");
+        }
+        if (version.FileStatus == FileStatus.CONFIRMED)
+        {
+            return ToDto(version);
+        }
+        if (version.FileStatus != FileStatus.UPLOAD_PENDING && version.FileStatus != FileStatus.UPLOADED)
+        {
+            throw new ConflictException("Submission version is not in a completable state.");
+        }
+        var metadata = await storage.GetMetadataAsync(version.File.StorageKey, cancellationToken)
+            ?? throw new ConflictException("Uploaded object metadata could not be verified.");
+        if (metadata.FileSizeBytes != version.File.FileSize || !string.Equals(metadata.MimeType, version.File.MimeType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException("Uploaded object metadata does not match the pending submission metadata.");
+        }
+        if (!string.IsNullOrWhiteSpace(version.File.ContentHash) && !string.Equals(version.File.ContentHash, metadata.ContentHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException("Uploaded object content hash does not match the pending submission metadata.");
+        }
+        version.FileStatus = FileStatus.CONFIRMED;
+        version.ConfirmedAt = clock.UtcNow;
+        if (version.TaskSubmission is not null && version.TaskSubmission.Status == SubmissionStatus.DRAFT)
+        {
+            version.TaskSubmission.Status = SubmissionStatus.SUBMITTED_FOR_REVIEW;
+            version.TaskSubmission.SubmittedAt = clock.UtcNow;
+        }
         return ToDto(version);
     }
 

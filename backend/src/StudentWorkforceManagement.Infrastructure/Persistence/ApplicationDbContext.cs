@@ -14,6 +14,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<StudentSkill> StudentSkills => Set<StudentSkill>();
     public DbSet<Category> Categories => Set<Category>();

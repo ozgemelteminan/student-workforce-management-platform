@@ -44,6 +44,7 @@ public sealed class PersistenceModelTests
         AssertHasUniqueIndex(context, typeof(NotificationPreference), nameof(NotificationPreference.UserId), nameof(NotificationPreference.PreferenceType), nameof(NotificationPreference.Channel));
         AssertHasUniqueIndex(context, typeof(EmailDelivery), nameof(EmailDelivery.IdempotencyKey));
         AssertHasUniqueIndex(context, typeof(SystemSetting), nameof(SystemSetting.Key));
+        AssertHasUniqueIndex(context, typeof(PasswordResetToken), nameof(PasswordResetToken.TokenHash));
     }
 
     [Fact]
@@ -84,6 +85,23 @@ public sealed class PersistenceModelTests
         AssertConcurrencyToken<SystemSetting>(context);
     }
 
+
+    [Fact]
+    public void Auth_persistence_stores_hashes_without_exposing_security_secrets()
+    {
+        using var context = CreateContext();
+        var userPasswordHash = GetProperty<User>(context, nameof(User.PasswordHash));
+        var resetTokenHash = GetProperty<PasswordResetToken>(context, nameof(PasswordResetToken.TokenHash));
+
+        Assert.Equal(typeof(string), userPasswordHash.ClrType);
+        Assert.Equal(1024, userPasswordHash.GetMaxLength());
+        Assert.Equal(typeof(string), resetTokenHash.ClrType);
+        Assert.Equal(512, resetTokenHash.GetMaxLength());
+        Assert.DoesNotContain(typeof(StudentWorkforceManagement.Application.Auth.DTOs.InvitationDto).Assembly.GetTypes()
+            .Where(type => type.Namespace?.StartsWith("StudentWorkforceManagement.Application.Auth.DTOs", StringComparison.Ordinal) == true)
+            .SelectMany(type => type.GetProperties()), property => property.Name.Contains("PasswordHash", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void File_metadata_is_owned_and_schema_does_not_store_binary_payloads()
     {
@@ -122,6 +140,7 @@ public sealed class PersistenceModelTests
         AssertRestrictDelete<TaskChecklistItem>(context, nameof(TaskChecklistItem.TaskId));
         AssertRestrictDelete<MarketplaceClaim>(context, nameof(MarketplaceClaim.MarketplaceListingId));
         AssertRestrictDelete<AuditLog>(context, nameof(AuditLog.UserId));
+        AssertRestrictDelete<PasswordResetToken>(context, nameof(PasswordResetToken.UserId));
     }
 
     [Fact]

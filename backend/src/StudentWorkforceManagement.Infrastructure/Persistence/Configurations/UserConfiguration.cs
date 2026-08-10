@@ -15,6 +15,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ConfigureConcurrencyToken();
         builder.Property(entity => entity.Email).HasMaxLength(256).IsRequired();
         builder.Property(entity => entity.DisplayName).HasMaxLength(200).IsRequired();
+        builder.Property(entity => entity.PasswordHash).HasMaxLength(1024);
         builder.Property(entity => entity.IsActive).IsRequired();
         builder.HasIndex(entity => entity.Email).IsUnique();
         builder.HasOne(entity => entity.Role)

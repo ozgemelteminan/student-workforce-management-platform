@@ -1,0 +1,5 @@
+namespace StudentWorkforceManagement.Infrastructure.BackgroundJobs.MarketplaceClaimExpiration;
+
+public sealed class MarketplaceClaimExpirationJob
+{
+}

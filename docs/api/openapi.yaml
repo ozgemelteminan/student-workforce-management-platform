@@ -1,0 +1,7 @@
+openapi: 3.1.0
+info:
+  title: Student Workforce Management Platform API
+  version: 0.1.0-foundation
+servers:
+  - url: /api/v1
+paths: {}

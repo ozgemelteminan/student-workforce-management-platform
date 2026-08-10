@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+bin/
+obj/
+TestResults/
+.vs/
+.vscode/
+node_modules/
+dist/
+coverage/
+.tmp/
+*.user
+*.suo
+*.log
+backend/src/StudentWorkforceManagement.Infrastructure/Persistence/Migrations/*.Designer.cs

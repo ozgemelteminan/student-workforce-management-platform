@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using StudentWorkforceManagement.Application.Common.Email;
@@ -14,6 +16,7 @@ using StudentWorkforceManagement.Infrastructure.BackgroundJobs.EmailDispatch;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.OverdueTasks;
 using StudentWorkforceManagement.Infrastructure.Email;
 using StudentWorkforceManagement.Infrastructure.Email.Delivery;
+using StudentWorkforceManagement.Infrastructure.Email.Providers;
 using StudentWorkforceManagement.Infrastructure.Persistence;
 using StudentWorkforceManagement.Infrastructure.Security.Password;
 using StudentWorkforceManagement.Infrastructure.Security.Tokens;
@@ -173,6 +176,56 @@ public sealed class InfrastructureProviderTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Development_email_provider_captures_reset_message_in_local_sink_only()
+    {
+        var sinkPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var provider = new DevelopmentEmailProvider(
+            new FakeHostEnvironment("Development"),
+            Options.Create(new EmailOptions
+            {
+                Provider = "Development",
+                DevelopmentSinkPath = sinkPath,
+                DevelopmentFrontendBaseUrl = "http://localhost:5173"
+            }),
+            new EmailTemplateRenderer(),
+            NullLogger<DevelopmentEmailProvider>.Instance);
+        var message = new EmailMessage(
+            "ada@example.com",
+            "Reset your password",
+            "auth.password-reset",
+            new Dictionary<string, string> { ["userId"] = Guid.NewGuid().ToString("N") },
+            "password-reset:1",
+            new Dictionary<string, string> { ["resetToken"] = "raw-reset-token" });
+
+        var result = await provider.SendAsync(message);
+
+        Assert.True(result.Accepted);
+        var latestResetMessage = await File.ReadAllTextAsync(Path.Combine(sinkPath, "latest-auth.password-reset.json"));
+        Assert.Contains("http://localhost:5173/reset-password?token=raw-reset-token", latestResetMessage, StringComparison.Ordinal);
+        Assert.Contains("raw-reset-token", latestResetMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Development_email_provider_cannot_be_used_outside_development()
+    {
+        var sinkPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var provider = new DevelopmentEmailProvider(
+            new FakeHostEnvironment("Production"),
+            Options.Create(new EmailOptions { Provider = "Development", DevelopmentSinkPath = sinkPath }),
+            new EmailTemplateRenderer(),
+            NullLogger<DevelopmentEmailProvider>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.SendAsync(new EmailMessage(
+            "ada@example.com",
+            "Reset your password",
+            "auth.password-reset",
+            new Dictionary<string, string>(),
+            "password-reset:blocked",
+            new Dictionary<string, string> { ["resetToken"] = "raw-reset-token" })));
+        Assert.False(Directory.Exists(sinkPath));
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Overdue_job_marks_due_tasks_once_and_creates_single_notification()
     {
         await using var context = CreateContext();
@@ -229,6 +282,14 @@ public sealed class InfrastructureProviderTests
     private sealed class FakeClock(DateTimeOffset? now = null) : IUtcClock
     {
         public DateTimeOffset UtcNow { get; } = now ?? DateTimeOffset.UtcNow;
+    }
+
+    private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ApplicationName { get; set; } = "StudentWorkforceManagement.Tests";
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
     private sealed class CapturingEmailProvider : IEmailProvider

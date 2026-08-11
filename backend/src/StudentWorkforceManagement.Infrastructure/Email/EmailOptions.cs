@@ -25,6 +25,8 @@ public sealed class EmailOptions
     public string FromEmail { get; init; } = "no-reply@example.invalid";
 
     public string FromName { get; init; } = "Student Workforce Management";
+    public string DevelopmentSinkPath { get; init; } = "storage/dev-emails";
+    public string DevelopmentFrontendBaseUrl { get; init; } = "http://localhost:5173";
     public string? SendGridApiKey { get; init; }
     public SmtpOptions Smtp { get; init; } = new();
 }

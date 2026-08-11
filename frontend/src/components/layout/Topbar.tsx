@@ -1,5 +1,5 @@
 import { Menu, Search } from 'lucide-react'
-import type { AuthUser } from '../../lib/auth/authTypes'
+import type { AuthSession, AuthUser } from '../../lib/auth/authTypes'
 import { Button } from '../ui/button'
 import { IconButton } from '../ui/icon-button'
 import { Breadcrumb } from '../ui/breadcrumb'
@@ -9,12 +9,14 @@ import type { NavigationItem } from './navigation'
 
 export function Topbar({
   user,
+  session,
   currentItem,
   onMobileMenu,
   onCommandPalette,
   onLogout,
 }: {
   user: AuthUser
+  session: AuthSession
   currentItem?: NavigationItem
   onMobileMenu: () => void
   onCommandPalette: () => void
@@ -33,7 +35,7 @@ export function Topbar({
         </Button>
         <IconButton label="Open command palette" tooltip="Command Palette" icon={<Search aria-hidden="true" className="h-4 w-4" />} className="sm:hidden" onClick={onCommandPalette} />
         <NotificationBell />
-        <UserMenu user={user} onLogout={onLogout} />
+        <UserMenu user={user} session={session} onLogout={onLogout} />
       </div>
     </header>
   )

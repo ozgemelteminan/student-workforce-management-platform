@@ -7,7 +7,7 @@ import { Sidebar } from '../../src/components/layout/Sidebar'
 import { Topbar } from '../../src/components/layout/Topbar'
 import { visibleNavigationGroups } from '../../src/components/layout/navigation'
 import { TooltipProvider } from '../../src/components/ui'
-import type { AuthUser } from '../../src/lib/auth/authTypes'
+import type { AuthSession, AuthUser } from '../../src/lib/auth/authTypes'
 
 const admin: AuthUser = {
   id: 'admin-id',
@@ -21,6 +21,17 @@ const student: AuthUser = {
   email: 'student@example.edu',
   displayName: 'Student User',
   roles: ['STUDENT'],
+}
+
+const session: AuthSession = {
+  sessionId: 'session-id',
+  accessToken: 'access-token',
+  refreshToken: 'refresh-token',
+  expiresAt: '2030-01-01T00:00:00Z',
+  accessTokenExpiresAt: '2030-01-01T00:00:00Z',
+  refreshTokenExpiresAt: '2030-01-01T00:00:00Z',
+  sessionExpiresAt: '2030-01-01T00:00:00Z',
+  user: admin,
 }
 
 describe('Phase 2 app shell infrastructure', () => {
@@ -74,7 +85,7 @@ describe('Phase 2 app shell infrastructure', () => {
     render(
       <MemoryRouter>
         <TooltipProvider>
-          <Topbar user={admin} onMobileMenu={() => undefined} onCommandPalette={onCommandPalette} onLogout={() => undefined} />
+          <Topbar user={admin} session={session} onMobileMenu={() => undefined} onCommandPalette={onCommandPalette} onLogout={() => undefined} />
         </TooltipProvider>
       </MemoryRouter>,
     )

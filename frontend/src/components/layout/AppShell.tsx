@@ -11,7 +11,7 @@ import { findNavigationItem } from './navigation'
 const collapsedStorageKey = 'swm.ui.sidebarCollapsed'
 
 export function AppShell() {
-  const { user, logout } = useAuth()
+  const { session, user, logout } = useAuth()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem(collapsedStorageKey) === 'true')
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -26,7 +26,7 @@ export function AppShell() {
     window.localStorage.setItem(collapsedStorageKey, String(collapsed))
   }, [collapsed])
 
-  if (!user) {
+  if (!user || !session) {
     return null
   }
 
@@ -43,7 +43,7 @@ export function AppShell() {
           </SheetContent>
         </Sheet>
         <div className={collapsed ? 'md:pl-20' : 'md:pl-72'}>
-          <Topbar user={user} currentItem={currentItem} onMobileMenu={() => setMobileOpen(true)} onCommandPalette={openCommandPalette} onLogout={() => void logout()} />
+          <Topbar user={user} session={session} currentItem={currentItem} onMobileMenu={() => setMobileOpen(true)} onCommandPalette={openCommandPalette} onLogout={() => void logout()} />
           <main className="min-h-[calc(100vh-4rem)] px-4 py-5 md:px-6 lg:px-8">
             <Outlet />
           </main>

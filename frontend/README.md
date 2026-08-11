@@ -43,7 +43,26 @@ Foundation code is organized around:
 - `src/lib/toast`: centralized toast helpers
 - `src/lib/utils`: shared utility primitives such as `cn(...)`
 
-Product workflows and final application screens are intentionally deferred to later frontend phases.
+Phase 3 implements the production authentication workflows. Domain workflows and final application screens are intentionally deferred to later frontend phases.
+
+## Authentication
+
+Implemented public auth routes:
+
+- `/login`
+- `/forgot-password`
+- `/reset-password`
+- `/invitations/accept`
+
+Implemented authenticated account route:
+
+- `/sessions`
+
+Auth endpoint wrappers live in `src/features/auth/api` and call only the canonical `src/lib/api` transport. The runtime OpenAPI/backend contract remains authoritative for routes, fields, response shapes, and authorization behavior.
+
+Login uses `POST /api/v1/auth/login`, refresh uses `POST /api/v1/auth/refresh`, logout uses `POST /api/v1/auth/logout`, password reset uses `POST /api/v1/auth/forgot-password` and `POST /api/v1/auth/reset-password`, invitation acceptance uses `POST /api/v1/invitations/accept`, and session management uses `/api/v1/sessions/`.
+
+Safe return-to navigation accepts only internal application paths and rejects external URLs, protocol-relative URLs, malformed targets, and auth workflow routes. Reset and invitation tokens are kept only in the active form workflow; they are not logged, stored in browser storage, or placed in toast text.
 
 ## Design System
 
@@ -60,6 +79,10 @@ The authenticated app shell lives in `src/components/layout`. Navigation visibil
 The backend currently returns client-managed access and refresh tokens from login. The frontend stores the active session in `sessionStorage`, not `localStorage`, so tokens are scoped to the current browser tab/session and handled only through the centralized auth layer.
 
 The refresh endpoint returns a new access token and rotated refresh token. The API client coordinates one refresh attempt for concurrent `401` responses, updates centralized auth state, and replays eligible requests once.
+
+On auth identity transitions, logout, or failed refresh, the auth provider clears the stored session and removes user-scoped TanStack Query cache. Current user display comes from the backend `AuthResponse.user`; no separate `/me` query is assumed.
+
+The frontend new-password validation mirrors the backend validators: 8-256 characters, at least one uppercase letter, at least one lowercase letter, and at least one number.
 
 ## Timezone
 

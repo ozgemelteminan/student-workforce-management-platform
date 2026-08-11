@@ -1,13 +1,30 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '../../components/layout/AppShell'
 import { RequireAuth } from '../../features/auth/RequireAuth'
+import { RequireRole } from '../../features/auth/RequireRole'
 import { AppPlaceholderPage } from '../../pages/AppPlaceholderPage'
-import { LoginPlaceholder } from '../../pages/auth/LoginPlaceholder'
+import { AcceptInvitationPage } from '../../pages/auth/AcceptInvitationPage'
+import { ForgotPasswordPage } from '../../pages/auth/ForgotPasswordPage'
+import { LoginPage } from '../../pages/auth/LoginPage'
+import { ResetPasswordPage } from '../../pages/auth/ResetPasswordPage'
+import { SessionsPage } from '../../pages/auth/SessionsPage'
 import { UiShowcasePage } from '../../pages/dev/UiShowcasePage'
 import { FoundationPage } from '../../pages/FoundationPage'
 import { NotFoundPage } from '../../pages/NotFoundPage'
+import type { UserRole } from '../../lib/auth/authTypes'
 
 const devRoutes = import.meta.env.DEV ? [{ path: '/__dev/ui', element: <UiShowcasePage /> }] : []
+const allRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER', 'REVIEWER', 'STUDENT']
+const staffRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER']
+const reviewRoles: UserRole[] = ['ADMIN', 'REVIEWER']
+
+function roleRoute(path: string, title: string, roles: UserRole[]) {
+  return {
+    path,
+    element: <RequireRole roles={roles} />,
+    children: [{ index: true, element: <AppPlaceholderPage title={title} /> }],
+  }
+}
 
 export const router = createBrowserRouter([
   {
@@ -17,20 +34,21 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: '/', element: <FoundationPage /> },
-          { path: '/tasks', element: <AppPlaceholderPage title="Tasks" /> },
-          { path: '/marketplace', element: <AppPlaceholderPage title="Marketplace" /> },
-          { path: '/students', element: <AppPlaceholderPage title="Students" /> },
-          { path: '/schedule', element: <AppPlaceholderPage title="Schedule" /> },
-          { path: '/requests', element: <AppPlaceholderPage title="Requests" /> },
-          { path: '/reviews', element: <AppPlaceholderPage title="Reviews" /> },
-          { path: '/files', element: <AppPlaceholderPage title="Files" /> },
-          { path: '/announcements', element: <AppPlaceholderPage title="Announcements" /> },
-          { path: '/templates', element: <AppPlaceholderPage title="Templates" /> },
-          { path: '/recurring-tasks', element: <AppPlaceholderPage title="Recurring Tasks" /> },
-          { path: '/notifications', element: <AppPlaceholderPage title="Notifications" /> },
-          { path: '/analytics', element: <AppPlaceholderPage title="Analytics" /> },
-          { path: '/audit-logs', element: <AppPlaceholderPage title="Audit Logs" /> },
-          { path: '/settings', element: <AppPlaceholderPage title="Settings" /> },
+          roleRoute('/tasks', 'Tasks', allRoles),
+          roleRoute('/marketplace', 'Marketplace', allRoles),
+          roleRoute('/students', 'Students', staffRoles),
+          roleRoute('/schedule', 'Schedule', allRoles),
+          roleRoute('/requests', 'Requests', allRoles),
+          roleRoute('/reviews', 'Reviews', reviewRoles),
+          roleRoute('/files', 'Files', allRoles),
+          roleRoute('/announcements', 'Announcements', allRoles),
+          roleRoute('/templates', 'Templates', staffRoles),
+          roleRoute('/recurring-tasks', 'Recurring Tasks', staffRoles),
+          roleRoute('/notifications', 'Notifications', allRoles),
+          roleRoute('/analytics', 'Analytics', staffRoles),
+          roleRoute('/audit-logs', 'Audit Logs', ['ADMIN']),
+          roleRoute('/settings', 'Settings', ['ADMIN']),
+          { path: '/sessions', element: <SessionsPage /> },
           ...devRoutes,
           { path: '*', element: <NotFoundPage /> },
         ],
@@ -39,7 +57,19 @@ export const router = createBrowserRouter([
   },
   {
     path: '/login',
-    element: <LoginPlaceholder />,
+    element: <LoginPage />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: '/invitations/accept',
+    element: <AcceptInvitationPage />,
   },
   {
     path: '*',

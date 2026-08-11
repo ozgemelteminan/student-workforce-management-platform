@@ -98,7 +98,7 @@ public sealed class PasswordAuthContractHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
         var roles = user.Role is null ? Array.Empty<string>() : new[] { user.Role.Name.ToString() };
         var accessToken = accessTokenService.CreateAccessToken(user, roles, session.Id);
-        return new AuthenticationResultDto(user.Id, session.Id, user.Email, user.DisplayName, roles, accessToken, rawRefreshToken, session.ExpiresAt, request.RefreshTokenExpiresAt.ToUniversalTime());
+        return new AuthenticationResultDto(user.Id, session.Id, user.Email, user.DisplayName, roles, accessToken.Token, accessToken.ExpiresAt, rawRefreshToken, session.ExpiresAt, request.RefreshTokenExpiresAt.ToUniversalTime());
     }
 
     public async System.Threading.Tasks.Task<PasswordResetRequestDto> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)

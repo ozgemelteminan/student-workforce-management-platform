@@ -47,6 +47,106 @@ Do NOT overwrite an explicit specification with personal assumptions.
 
 ---
 
+## Frontend Agent Rules
+
+Before any frontend task, read the `Frontend Product, UX, and Design Specification` section of `MASTER_SPECIFICATION.md`.
+
+For frontend/API integration, the runtime OpenAPI contract is authoritative.
+
+Never invent backend endpoints, request fields, response fields, enum values, permissions, persistence behavior, or workflow states.
+
+If a required UX workflow cannot be implemented with the current API, report the exact API/contract gap instead of:
+
+- faking success
+- using permanent mock data
+- creating frontend-only persistence
+- silently changing the workflow
+
+Do not modify backend architecture merely for frontend convenience. Any genuine backend gap must be identified explicitly and fixed only through the smallest coherent change when the task actually requires it.
+
+Use workflow-first frontend composition. Do not create one page/button/component per backend endpoint. Related API capabilities should be composed into coherent product workflows.
+
+Reuse the canonical frontend design system defined in `MASTER_SPECIFICATION.md`. Do not independently invent:
+
+- new brand colors
+- new destructive colors
+- new button styles
+- new card styles
+- new status semantics
+- new spacing systems
+- new modal/drawer patterns
+
+Preserve the canonical visual system:
+
+- warm off-white workspace
+- charcoal navigation
+- white surfaces
+- restrained brand red
+- separate destructive red semantics
+
+Brand red and destructive red must remain semantically separate.
+
+Do not leave permanent production-looking mock data in completed frontend workflows.
+
+A frontend workflow is not complete until it has:
+
+- real API integration
+- loading state
+- empty state
+- error state
+- authorization-aware UI behavior where relevant
+
+Frontend role-based visibility is a UX convenience only. Backend authorization remains authoritative. Handle `401` and `403` correctly.
+
+Use the canonical API client layer. Do not scatter independent raw `fetch()` calls or duplicate token-refresh logic across components.
+
+Use TanStack Query as the primary server-state mechanism. Do not unnecessarily mirror backend state into global client stores.
+
+Signed download URLs are temporary credentials:
+
+- request them on demand
+- never persist or log them
+- never store them as long-lived entity state
+- do not unnecessarily buffer large downloads in JavaScript memory
+
+All user-facing application timestamps must use the centralized timezone utilities and render according to `Europe/Istanbul`, independent of browser timezone.
+
+Do not scatter raw date/time formatting logic across components.
+
+Respect the canonical large-file policy:
+
+- up to 1 GB per file
+- no Base64 file transport
+- no full-file buffering
+- use direct signed upload/download flows where applicable
+
+Preserve accessibility requirements:
+
+- visible keyboard focus
+- semantic controls
+- explanatory validation messages
+- no color-only meaning
+- accessible dialogs, menus, tables, and command palette
+
+Implement frontend work in controlled phases according to the implementation order in `MASTER_SPECIFICATION.md`.
+
+Do not attempt to build the entire frontend in one uncontrolled pass.
+
+After each frontend phase:
+
+- keep the app runnable
+- run the relevant frontend build/type-check/tests
+- report any API contract gaps
+- do not begin the next phase unless explicitly requested
+
+Do not silently weaken tests, authorization, validation, or API contracts to make frontend code pass.
+
+Prefer production-ready reusable primitives and domain components over large page components with duplicated logic.
+
+Treat `MASTER_SPECIFICATION.md` and `AGENTS.md` as binding project instructions. When handwritten legacy API examples conflict with runtime OpenAPI, runtime OpenAPI wins for frontend integration and the conflict must be reported.
+
+---
+
 # 2. CORE PROJECT PRINCIPLES
 
 The application MUST follow:

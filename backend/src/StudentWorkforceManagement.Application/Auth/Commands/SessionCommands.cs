@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StudentWorkforceManagement.Application.Auth.DTOs;
+using StudentWorkforceManagement.Application.Auth.Services;
 using StudentWorkforceManagement.Application.Common.Behaviors;
 using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Interfaces;
@@ -17,7 +18,7 @@ public sealed record CreateSessionCommand(Guid UserId, string? DeviceName, strin
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AdminOnly;
 }
 
-public sealed record RefreshTokenCommand(string RawRefreshToken, DateTimeOffset NewExpiresAt) : IRequest<RefreshTokenRotationDto>, ITransactionalRequest;
+public sealed record RefreshTokenCommand(string RawRefreshToken, DateTimeOffset NewExpiresAt) : IRequest<AuthenticationResultDto>, ITransactionalRequest;
 
 public sealed record LogoutCommand(Guid SessionId) : IRequest<Unit>, IAuthorizableRequest
 {
@@ -54,9 +55,9 @@ public sealed class RefreshTokenCommandValidator : AbstractValidator<RefreshToke
     }
 }
 
-public sealed class SessionCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, ISecureTokenGenerator tokenGenerator, IUtcClock clock)
+public sealed class SessionCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, ISecureTokenGenerator tokenGenerator, IAccessTokenService accessTokenService, IUtcClock clock)
     : IRequestHandler<CreateSessionCommand, SessionDto>,
-      IRequestHandler<RefreshTokenCommand, RefreshTokenRotationDto>,
+      IRequestHandler<RefreshTokenCommand, AuthenticationResultDto>,
       IRequestHandler<LogoutCommand, Unit>,
       IRequestHandler<RevokeSessionCommand, SessionDto>,
       IRequestHandler<RevokeAllSessionsCommand, int>
@@ -78,15 +79,37 @@ public sealed class SessionCommandHandler(IApplicationDbContext dbContext, ICurr
         return ToDto(session);
     }
 
-    public async System.Threading.Tasks.Task<RefreshTokenRotationDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
+    public async System.Threading.Tasks.Task<AuthenticationResultDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
     {
         var oldHash = tokenGenerator.HashToken(request.RawRefreshToken);
-        var existing = await dbContext.RefreshTokens.Include(token => token.Session).SingleOrDefaultAsync(token => token.TokenHash == oldHash, cancellationToken)
-            ?? throw new NotFoundException("RefreshToken", "token");
-        if (existing.RevokedAt.HasValue || existing.ReplacedAt.HasValue || existing.ExpiresAt <= clock.UtcNow || existing.Session?.RevokedAt != null)
+        var existing = await dbContext.RefreshTokens
+            .Include(token => token.Session)
+                .ThenInclude(session => session!.User)
+                    .ThenInclude(user => user!.Role)
+            .Include(token => token.Session)
+                .ThenInclude(session => session!.User)
+                    .ThenInclude(user => user!.Student)
+            .SingleOrDefaultAsync(token => token.TokenHash == oldHash, cancellationToken);
+        if (existing is null)
         {
-            throw new ConflictException("Refresh token is not active.");
+            throw new ForbiddenException("Refresh token is not valid.");
         }
+
+        var session = existing.Session;
+        var user = session?.User;
+        if (existing.RevokedAt.HasValue
+            || existing.ReplacedAt.HasValue
+            || existing.ExpiresAt <= clock.UtcNow
+            || session is null
+            || session.RevokedAt.HasValue
+            || session.ExpiresAt <= clock.UtcNow
+            || user is null
+            || !user.IsActive
+            || user.DeletedAt.HasValue)
+        {
+            throw new ForbiddenException("Refresh token is not valid.");
+        }
+
         var rawNewToken = tokenGenerator.GenerateToken();
         existing.ReplacedAt = clock.UtcNow;
         dbContext.RefreshTokens.Add(new RefreshToken
@@ -96,7 +119,9 @@ public sealed class SessionCommandHandler(IApplicationDbContext dbContext, ICurr
             TokenHash = tokenGenerator.HashToken(rawNewToken),
             ExpiresAt = request.NewExpiresAt.ToUniversalTime()
         });
-        return new RefreshTokenRotationDto(existing.SessionId, rawNewToken, request.NewExpiresAt.ToUniversalTime());
+        var roles = user.Role is null ? Array.Empty<string>() : new[] { user.Role.Name.ToString() };
+        var accessToken = accessTokenService.CreateAccessToken(user, roles, session.Id);
+        return new AuthenticationResultDto(user.Id, session.Id, user.Email, user.DisplayName, roles, accessToken.Token, accessToken.ExpiresAt, rawNewToken, session.ExpiresAt, request.NewExpiresAt.ToUniversalTime());
     }
 
     public async System.Threading.Tasks.Task<Unit> Handle(LogoutCommand request, CancellationToken cancellationToken)

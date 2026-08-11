@@ -12,9 +12,10 @@ public sealed class JwtAccessTokenService(IOptions<JwtOptions> options) : IAcces
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateAccessToken(User user, IReadOnlyCollection<string> roles, Guid sessionId)
+    public AccessTokenResult CreateAccessToken(User user, IReadOnlyCollection<string> roles, Guid sessionId)
     {
         var now = DateTimeOffset.UtcNow;
+        var expiresAt = now.AddMinutes(_options.AccessTokenMinutes);
         var header = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
         {
             ["alg"] = "HS256",
@@ -26,7 +27,7 @@ public sealed class JwtAccessTokenService(IOptions<JwtOptions> options) : IAcces
             ["aud"] = _options.Audience,
             ["iat"] = now.ToUnixTimeSeconds(),
             ["nbf"] = now.ToUnixTimeSeconds(),
-            ["exp"] = now.AddMinutes(_options.AccessTokenMinutes).ToUnixTimeSeconds(),
+            ["exp"] = expiresAt.ToUnixTimeSeconds(),
             [ClaimTypes.NameIdentifier] = user.Id.ToString("D"),
             ["sub"] = user.Id.ToString("D"),
             ["sid"] = sessionId.ToString("D"),
@@ -40,7 +41,7 @@ public sealed class JwtAccessTokenService(IOptions<JwtOptions> options) : IAcces
         var payload = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(claims));
         var unsignedToken = $"{header}.{payload}";
         var signature = Sign(unsignedToken, _options.SigningKey);
-        return $"{unsignedToken}.{signature}";
+        return new AccessTokenResult($"{unsignedToken}.{signature}", expiresAt);
     }
 
     private static string Sign(string value, string key)

@@ -8,9 +8,7 @@ public sealed record CreatedInvitationDto(Guid Id, string Email, DateTimeOffset 
 
 public sealed record SessionDto(Guid Id, Guid UserId, string? DeviceName, string? IpAddress, DateTimeOffset ExpiresAt, DateTimeOffset? RevokedAt, DateTimeOffset CreatedAt);
 
-public sealed record RefreshTokenRotationDto(Guid SessionId, string RawRefreshToken, DateTimeOffset ExpiresAt);
-
-public sealed record AuthenticationResultDto(Guid UserId, Guid SessionId, string Email, string DisplayName, IReadOnlyCollection<string> Roles, string AccessToken, string RawRefreshToken, DateTimeOffset SessionExpiresAt, DateTimeOffset RefreshTokenExpiresAt);
+public sealed record AuthenticationResultDto(Guid UserId, Guid SessionId, string Email, string DisplayName, IReadOnlyCollection<string> Roles, string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RawRefreshToken, DateTimeOffset SessionExpiresAt, DateTimeOffset RefreshTokenExpiresAt);
 
 public sealed record PasswordResetRequestDto(string Email, DateTimeOffset ExpiresAt);
 

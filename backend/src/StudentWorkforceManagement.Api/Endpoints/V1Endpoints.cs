@@ -8,6 +8,7 @@ using StudentWorkforceManagement.Application.Announcements.Queries.GetAnnounceme
 using StudentWorkforceManagement.Application.Announcements.Queries.GetAnnouncements;
 using StudentWorkforceManagement.Application.Audit.Queries;
 using StudentWorkforceManagement.Application.Auth.Commands;
+using StudentWorkforceManagement.Application.Auth.DTOs;
 using StudentWorkforceManagement.Application.Auth.Queries;
 using StudentWorkforceManagement.Application.Availability.Commands;
 using StudentWorkforceManagement.Application.Availability.Commands.CreateAvailability;
@@ -120,17 +121,17 @@ public static class V1Endpoints
             {
                 var result = await sender.Send(new LoginCommand(request.Email, request.Password, request.DeviceName, ip, clock.UtcNow.AddHours(8), clock.UtcNow.AddDays(30)), cancellationToken);
                 limiter.Reset("login", request.Email, ip);
-                return Results.Ok(new AuthResponse(result.AccessToken, result.RawRefreshToken, result.SessionExpiresAt, result.RefreshTokenExpiresAt, new AuthUserResponse(result.UserId, result.Email, result.DisplayName, result.Roles)));
+                return Results.Ok(ToAuthResponse(result));
             }
             catch (ForbiddenException)
             {
                 limiter.RecordFailure("login", request.Email, ip, LoginFailureWindow);
                 throw;
             }
-        }).AllowAnonymous();
+        }).AllowAnonymous().Produces<AuthResponse>(StatusCodes.Status200OK);
 
         auth.MapPost("/refresh", async (RefreshRequest request, ISender sender, IUtcClock clock, CancellationToken cancellationToken) =>
-            Results.Ok(await sender.Send(new RefreshTokenCommand(request.RefreshToken, clock.UtcNow.AddDays(30)), cancellationToken))).AllowAnonymous();
+            Results.Ok(ToAuthResponse(await sender.Send(new RefreshTokenCommand(request.RefreshToken, clock.UtcNow.AddDays(30)), cancellationToken)))).AllowAnonymous().Produces<AuthResponse>(StatusCodes.Status200OK);
         auth.MapPost("/logout", async (LogoutRequest request, ISender sender, CancellationToken cancellationToken) =>
         {
             await sender.Send(new LogoutCommand(request.SessionId), cancellationToken);
@@ -174,6 +175,9 @@ public static class V1Endpoints
         sessions.MapDelete("/", async (Guid? userId, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(new { revoked = await sender.Send(new RevokeAllSessionsCommand(userId), cancellationToken) }));
     }
+
+    private static AuthResponse ToAuthResponse(AuthenticationResultDto result) =>
+        new(result.AccessToken, result.RawRefreshToken, result.AccessTokenExpiresAt, result.AccessTokenExpiresAt, result.RefreshTokenExpiresAt, result.SessionId, result.SessionExpiresAt, new AuthUserResponse(result.UserId, result.Email, result.DisplayName, result.Roles));
 
     private static void MapCatalog(RouteGroupBuilder api)
     {
@@ -430,7 +434,7 @@ public static class V1Endpoints
     public sealed record RequestQueryParams(int Page = 1, int PageSize = 20, string? Search = null, Guid? TaskId = null, RequestType? Type = null, RequestStatus? Status = null);
     public sealed record AuditQueryParams(int Page = 1, int PageSize = 20, string? Search = null, string? Action = null, string? EntityType = null, Guid? UserId = null, DateTimeOffset? From = null, DateTimeOffset? To = null);
     public sealed record LoginRequest(string Email, string Password, string? DeviceName);
-    public sealed record AuthResponse(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, DateTimeOffset RefreshTokenExpiresAt, AuthUserResponse User);
+    public sealed record AuthResponse(string AccessToken, string RefreshToken, DateTimeOffset ExpiresAt, DateTimeOffset AccessTokenExpiresAt, DateTimeOffset RefreshTokenExpiresAt, Guid SessionId, DateTimeOffset SessionExpiresAt, AuthUserResponse User);
     public sealed record AuthUserResponse(Guid Id, string Email, string DisplayName, IReadOnlyCollection<string> Roles);
     public sealed record RefreshRequest(string RefreshToken);
     public sealed record LogoutRequest(Guid SessionId);

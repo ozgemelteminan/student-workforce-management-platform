@@ -1,13 +1,23 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { useState, type ReactNode } from 'react'
+import { Toaster } from 'sonner'
+import { AuthProvider } from '../../lib/auth/AuthProvider'
+import { createAppQueryClient } from '../../lib/query'
 import '../../i18n'
-
-const queryClient = new QueryClient()
 
 type AppProvidersProps = {
   children: ReactNode
 }
 
 export function AppProviders({ children }: AppProvidersProps) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  const [queryClient] = useState(() => createAppQueryClient())
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        {children}
+        <Toaster richColors closeButton position="top-right" />
+      </AuthProvider>
+    </QueryClientProvider>
+  )
 }

@@ -2662,7 +2662,7 @@ Do not run production containers as root unless unavoidable.
 
 ------------------------------------------------------------------------
 
-# 61. FRONTEND ARCHITECTURE
+# 61.1 FRONTEND ARCHITECTURE
 
 Suggested:
 
@@ -2707,7 +2707,1922 @@ NotificationDropdown
 FileUploader
 SubmissionVersionList
 ```
+# 61.2 Frontend Product, UX, and Design Specification
+This section defines the authoritative frontend product, UX, visual design, interaction, and implementation requirements for the Student Workforce Management Platform.
+The frontend must be implemented as a production-grade operational SaaS application. It must not look or behave like a traditional university portal, a generic admin dashboard template, or a collection of disconnected CRUD pages.
+The frontend must expose the power of the backend through coherent user workflows while keeping the interface calm, predictable, and efficient.
+The runtime API/OpenAPI contract is authoritative for frontend integration.
+Do not invent backend capabilities that do not exist.
+If a required frontend workflow cannot be implemented using the current API contract, report the exact contract gap instead of faking the behavior with local-only state, hardcoded data, hidden assumptions, or simulated success.
+1. Frontend Technology Stack
+Use:
 
+React
+TypeScript
+Vite
+Tailwind CSS
+React Router
+TanStack Query
+React Hook Form
+Zod
+Lucide icons
+Recharts
+Sonner for toast notifications
+a production-grade accessible calendar/scheduling library when needed
+accessible headless primitives such as Radix UI where useful
+Do not introduce a large UI framework that overrides the design system.
+Avoid heavy component suites that make the application look like a default enterprise template.
+Reusable UI primitives should be owned by the project.
+2. Product Design Direction
+The frontend must look like a modern operational SaaS platform.
+Visual goals:
+
+professional
+calm
+information-dense without feeling crowded
+modern
+consistent
+efficient
+desktop-first
+subtle rather than decorative
+highly usable for repeated daily workflows
+The visual character should combine:
+
+restrained SaaS minimalism
+strong operational information hierarchy
+compact task-management workflows
+clear administrative controls
+subtle institutional visual identity through color
+Do not copy another product directly.
+Avoid:
+
+large decorative gradients
+glassmorphism
+excessive shadows
+oversized marketing-style typography
+excessive rounded cards
+neon colors
+rainbow status systems
+unnecessary animations
+dashboard widgets that exist only for decoration
+large empty spaces that reduce information efficiency
+generic Bootstrap-like admin layouts
+The interface should feel intentionally designed rather than generated from a dashboard template.
+3. Core Color System
+Use the following color direction as the canonical frontend palette.
+
+Page and surface colors
+Page background:
+#F7F4EF
+Primary surface:
+#FFFFFF
+Secondary/subtle surface:
+#F1EDE7
+Sidebar:
+#242424
+Sidebar secondary/elevated surface:
+#303030
+
+Typography colors
+Primary text:
+#242424
+Secondary text:
+#66615C
+Muted text:
+#96908A
+Inverse text:
+#FFFFFF
+
+Border colors
+Default border:
+#E2DDD6
+Stronger border:
+#D4CEC6
+
+Brand colors
+Primary brand red:
+#C91F28
+Primary brand hover:
+#A9151C
+Primary brand subtle background:
+#FBEAEC
+The primary brand red is used for:
+
+primary calls to action
+active navigation indicators
+selected states
+important branded accents
+focused visual emphasis
+small chart highlights where appropriate
+Do not use brand red as the default color for every badge, status, chart, button, or icon.
+4. Brand Red vs. Destructive Red
+Brand red and destructive/error red must be treated as separate semantic concepts.
+Primary brand red:
+#C91F28
+is a product/brand action color.
+Destructive red must use a separate token, such as:
+#DC2626
+or an equivalent accessible destructive color.
+Destructive red is reserved for actions such as:
+
+Delete
+Permanently Remove
+Reject
+Revoke where destructive
+destructive confirmation dialogs
+critical failures
+A positive primary action such as:
+Create Task
+must not visually communicate the same meaning as:
+Delete Task
+even though both may involve red-family colors.
+This distinction must be preserved across:
+
+buttons
+dialogs
+menus
+icons
+alerts
+badges
+form validation
+5. Semantic Colors
+Semantic colors must be separate from brand colors.
+Use restrained tones for:
+
+Success
+Warning
+Information
+Danger
+Neutral
+Suggested semantic direction:
+Success:
+muted green
+Warning:
+amber
+Information:
+muted blue
+Danger:
+destructive red
+Neutral:
+graphite / warm gray
+Semantic color must communicate meaning consistently.
+Do not assign arbitrary colors to entities merely for visual variety.
+6. Status Design
+Task and workflow statuses must be visually distinguishable without creating a rainbow interface.
+Status indicators should primarily use:
+
+subtle tinted backgrounds
+readable text labels
+small status dots where useful
+restrained borders
+Suggested conceptual direction:
+ASSIGNED:
+neutral blue-gray
+ACCEPTED:
+soft neutral/indigo-like informational tone
+IN_PROGRESS:
+blue/information
+SUBMITTED:
+subtle violet or information variant
+REVISION_REQUESTED:
+amber
+APPROVED / COMPLETED:
+green
+CANCELLED:
+neutral gray
+OVERDUE:
+danger red
+Do not rely on color alone.
+Always include a readable text label.
+7. Typography
+Use a modern sans-serif font stack with Inter-like characteristics.
+Typography should prioritize readability and information hierarchy.
+Use clear distinctions between:
+
+page titles
+section headings
+labels
+body text
+metadata
+helper text
+table text
+Avoid oversized headings.
+This is an operational application, not a marketing website.
+Page titles should normally be compact.
+8. Spacing and Layout Density
+The product should feel compact but breathable.
+Avoid both extremes:
+
+overly dense enterprise tables
+overly spacious consumer-style cards
+Use consistent spacing tokens.
+Favor approximately:
+
+4px
+8px
+12px
+16px
+20px
+24px
+32px
+as the primary spacing scale.
+Operational screens should make good use of desktop width.
+Do not constrain every page to a narrow centered marketing container.
+9. Radius and Shadow Rules
+Use moderate border radius.
+Typical radius:
+8–12px.
+Avoid extreme pill-shaped cards.
+Pills are appropriate only for:
+
+compact filters
+tags
+status badges
+chips
+Most surfaces should rely on:
+
+white background
+thin border
+subtle separation
+rather than heavy shadows.
+Use shadows only where elevation has semantic meaning, for example:
+
+dropdown menus
+floating dialogs
+drawers
+command palette
+toast notifications
+10. Application Shell
+The primary desktop application shell must contain:
+
+collapsible left sidebar
+main content workspace
+lightweight topbar
+notification access
+user/profile access
+The main workspace background uses the warm off-white page background.
+Primary content surfaces use white.
+The sidebar uses charcoal.
+11. Sidebar Navigation
+Use grouped navigation.
+
+WORKSPACE
+Dashboard
+Tasks
+Marketplace
+WORKFORCE
+Students
+Schedule
+Requests
+Reviews
+CONTENT
+Files
+Announcements
+Templates
+Recurring Tasks
+INSIGHTS
+Analytics
+ADMIN
+Audit Logs
+Settings
+The sidebar must support collapsing on desktop.
+When collapsed:
+
+icons remain visible
+accessible tooltips identify destinations
+The bottom area should include:
+
+current user identity
+current role
+account/profile access
+logout
+12. Role-Based Navigation
+Navigation visibility must reflect the user's effective role/capabilities.
+Do not show unauthorized destinations merely to disable them later.
+However:
+Frontend visibility is not an authorization boundary.
+The backend remains authoritative for authorization.
+The frontend must gracefully handle 401 and 403 responses even for routes that were hidden by role-based UI logic.
+Do not duplicate complex authorization rules independently in the frontend when they can be derived from canonical role/capability information.
+13. Topbar
+The topbar should remain lightweight.
+It may contain:
+
+contextual breadcrumb when useful
+page-level quick actions
+global search trigger
+command palette trigger
+notification bell
+user menu
+Do not repeat the entire sidebar navigation in the topbar.
+14. Core Screens
+The frontend must support the following primary product surfaces.
+Authentication:
+
+Login
+Invitation Accept
+Forgot Password
+Reset Password
+Workspace:
+
+Dashboard
+Tasks
+Task Create/Edit
+Task Detail
+Focus Mode / My Day
+Marketplace
+Workforce:
+
+Students
+Student Detail
+Schedule & Availability
+Requests
+Reviews
+Content:
+
+Files
+Announcements
+Notifications
+Templates
+Recurring Tasks
+Insights and Administration:
+
+Analytics
+Audit Logs
+Settings
+A separate page is not required for every backend endpoint.
+Related endpoints should be composed into coherent product workflows.
+15. Workflow-First API Integration
+The backend currently exposes a large API surface.
+Do not translate each API endpoint into an isolated page or button.
+Frontend architecture must be organized around user workflows.
+For example, Task Detail may naturally compose:
+
+task detail
+history
+dependencies
+required skills
+comments
+checklist
+submissions
+submission versions
+feedback
+recommendations
+assignment actions
+lifecycle actions
+into one coherent workspace.
+Similarly, Student Detail may compose:
+
+profile
+skills
+task workload
+schedule
+availability
+feedback
+into one coherent profile experience.
+The frontend should make the backend feel simpler than the backend actually is.
+16. Dashboard
+The dashboard must be operational and action-oriented.
+Do not create a dashboard made only of decorative KPI cards.
+A small number of KPIs is acceptable.
+Suggested high-level information:
+
+Active Tasks
+Pending Reviews
+Pending Requests
+Open Marketplace Tasks
+Workload Summary
+The primary focus should be actionable sections such as:
+
+Needs Attention
+Examples:
+
+overdue tasks
+revision requested submissions
+pending requests
+pending marketplace claims
+tasks approaching deadline
+Upcoming Deadlines
+Show upcoming task deadlines with relevant context.
+
+Workload Overview
+Show meaningful workload distribution across students.
+
+Marketplace Activity
+Show open listings and claim activity where relevant.
+
+Recent Activity
+Show recent operational changes.
+Dashboard sections should link directly into the relevant workflow.
+17. Smart Attention System
+The dashboard must include a Smart Attention System.
+Its purpose is not AI prediction.
+It is deterministic operational prioritization using existing backend data.
+Examples:
+
+3 tasks are overdue
+4 submissions need review
+2 extension requests are waiting
+1 marketplace claim requires action
+2 students currently have high workload
+Attention items should:
+
+clearly state the issue
+show relevant count
+provide direct navigation
+use restrained warning/danger semantics
+Do not imply machine learning or AI unless such functionality actually exists.
+18. Tasks Screen
+Tasks is one of the primary operational screens.
+Provide:
+
+search
+filtering
+sorting
+status filtering
+assignee filtering
+category filtering
+priority filtering where supported
+saved views
+list view
+optional board view where useful
+Primary action:
+New Task
+Task rows/cards should surface high-value information such as:
+
+title
+status
+priority
+category
+assignee
+due date
+estimated duration
+required skills when useful
+Do not overload task cards with every available field.
+19. Saved Task Views
+Provide useful predefined views such as:
+
+My Tasks
+Overdue
+Due This Week
+Unassigned
+Needs Review
+Marketplace
+If persistent user-created saved filters are not currently supported by the backend, predefined frontend views may be used.
+Do not pretend locally saved views are server-persisted unless persistence exists.
+If user-defined persistent saved views are desired but unsupported, report the API/storage gap before implementing persistence.
+20. Task Detail
+Task Detail must be a high-information workspace.
+Avoid a single oversized form.
+Recommended layout:
+
+Header
+back navigation
+task title
+status
+priority
+high-value primary action
+contextual action menu
+Main content
+description
+checklist
+attachments/files
+comments
+submission/review information
+Contextual side panel
+assignee
+category
+due date
+estimated duration
+required skills
+dependencies
+metadata
+Use tabs or sections where useful.
+Suggested conceptual tabs:
+
+Overview
+Activity
+Submission
+Feedback
+The exact structure may adapt to available API contracts.
+21. Activity Timeline
+Task detail should contain a clear activity/history timeline where backend data supports it.
+Examples:
+
+task created
+assigned
+reassigned
+accepted
+started
+submitted
+revision requested
+approved
+cancelled
+The timeline should display:
+
+event/action
+actor when known
+timestamp
+meaningful contextual detail
+Do not invent history events in the frontend.
+22. Quick Preview Drawer
+High-density screens should support a Quick Preview Drawer where useful.
+Examples:
+
+Task list -> preview task
+Student list -> preview student
+Request list -> preview request
+Review queue -> preview submission
+The drawer should provide enough information to make a quick decision without always leaving the current list.
+It should include a clear:
+Open full details
+action where a full page exists.
+Do not duplicate every field from the detail page.
+23. Contextual Action Menus
+Do not render every possible operation as a visible button.
+Use a hierarchy:
+Primary/high-frequency action:
+visible button
+Secondary actions:
+ellipsis ... context menu
+Destructive actions:
+separated visually inside the context menu
+Examples of secondary actions:
+
+Edit
+Reassign
+Duplicate when supported
+Cancel
+Delete where supported
+Context menus should use accessible headless menu primitives.
+24. Focus Mode / My Day
+Students should have a focused task-working experience.
+When appropriate, a student may enter Focus Mode from a task.
+Focus Mode should reduce navigation distraction.
+Possible behavior:
+
+sidebar collapses
+task context remains visible
+checklist becomes prominent
+files remain accessible
+comments remain accessible
+submission action remains accessible
+Do not require a timer in the initial version.
+Do not fabricate time-tracking behavior unless backend support exists.
+25. Students Screen
+The Students screen should support operational workforce management.
+Use a high-quality table or hybrid list.
+Important visible information may include:
+
+name
+relevant skills
+active task count
+workload
+availability indicator
+status
+Provide filtering where supported.
+Potential filters:
+
+active/inactive
+skill
+availability
+workload
+Do not calculate misleading workload percentages without a clear deterministic basis.
+26. Student Detail
+Student Detail should combine student-related information into one coherent profile.
+Possible sections/tabs:
+
+Overview
+Tasks
+Schedule
+Availability
+Feedback
+Overview may show:
+
+identity/profile
+skills
+workload
+active assignments
+relevant task statistics
+Do not expose private/internal information that the API does not authorize.
+27. Workload Visualization
+Workload should be quickly understandable.
+Use compact visual indicators such as:
+
+small progress bars
+labeled capacity states
+task counts
+Do not rely only on color.
+Example:
+Moderate · 3 active tasks
+is preferable to an unlabeled colored bar.
+28. Marketplace
+Marketplace represents an open task pool.
+It must not look like an external jobs website.
+Marketplace cards should remain consistent with the core task design system.
+Useful information:
+
+task title
+category
+estimated duration
+due date
+required skills
+listing/claim state
+Student actions may include:
+
+view
+claim
+cancel claim where supported
+Staff actions may include:
+
+publish
+unpublish
+approve claim
+reject claim
+Only show actions permitted by actual role/state rules.
+29. Schedule and Availability
+Use an intuitive weekly schedule/grid or calendar view.
+Course schedule and work availability must have distinct visual meaning.
+Users should be able to understand:
+
+when a student is in class
+when a student is available
+current schedule context
+Do not use similar colors for conflicting states.
+Calendar usage must remain accessible and usable without relying entirely on color.
+30. Requests
+Requests should support efficient review.
+A master-detail layout is preferred where practical.
+List side:
+
+request type
+student
+status
+created/requested date
+relevant task
+Detail side:
+
+request explanation
+requested change
+contextual task/student information
+approve/reject actions when permitted
+Destructive/reject actions must use destructive semantics.
+31. Reviews
+Reviewer workflows require a dedicated operational queue.
+The Reviews screen should surface:
+
+task
+student
+submitted timestamp
+version
+status
+Review detail should make it easy to:
+
+inspect submission
+inspect files/versions
+understand task context
+approve
+request revision
+REVIEWER capabilities must follow backend authorization.
+Do not expose approval UI to roles that cannot perform it.
+32. Files
+
+Files should behave like a lightweight modern file manager.
+
+Provide:
+
+breadcrumb navigation
+folder navigation
+search/filter where supported
+create folder
+upload
+download
+delete where allowed
+
+File rows should show useful metadata such as:
+
+filename
+type
+size
+uploader when available
+upload date
+
+Direct upload flows must respect the backend's signed upload contract.
+
+Do not convert file content to Base64.
+
+Do not buffer large files in frontend memory unnecessarily.
+
+Provide upload progress where technically available.
+
+Authenticated Download Behavior
+
+For file downloads that require authentication, the frontend must first request the authorized short-lived download URL through the canonical API client using the current Bearer-authenticated session.
+
+The browser download should then be triggered using the returned signed URL.
+
+Do not attempt to attach Authorization headers directly to plain <a href> links or window.open() calls.
+
+Do not unnecessarily download large files into JavaScript memory as blobs merely to initiate a browser download.
+
+Signed download URLs are temporary credentials.
+
+Do not:
+
+persist signed URLs in localStorage
+persist signed URLs in sessionStorage
+log signed URLs
+include signed URLs in analytics or telemetry
+expose signed URLs in toast messages
+expose signed URLs in application error messages
+reuse signed URLs after expiration
+treat signed URLs as permanent file identifiers
+store signed URLs as long-lived TanStack Query cached entity data
+
+Signed download URLs should preferably be requested on-demand when the user explicitly initiates a download.
+
+If a signed download URL expires, the frontend must request a new authorized URL from the API rather than repeatedly retrying the expired URL.
+
+The frontend should keep permanent file metadata and temporary download credentials conceptually separate.
+
+The canonical file ID or backend resource identifier should be stored and reused.
+
+The signed URL should be treated as short-lived transport data only.
+
+Frontend download behavior must continue to respect backend authorization and ownership rules.
+
+A visible download button does not imply authorization.
+
+The backend remains authoritative.
+
+33. Upload UX
+File uploads must provide clear state:
+
+preparing upload
+uploading
+completing
+success
+failure
+Supported file validation should reflect backend policy.
+Frontend validation is convenience only.
+Backend validation remains authoritative.
+Do not imply that frontend validation guarantees acceptance.
+34. Announcements
+Announcements should support two experiences.
+Staff/admin management:
+
+draft
+published
+pinned
+create
+edit
+publish/unpublish
+pin/unpin
+delete
+Student/user experience:
+
+readable announcement feed
+pinned announcement emphasis
+publication date
+author/context where available
+Pinned announcements may use subtle brand-red emphasis.
+Avoid large full-red cards.
+35. Notifications
+Notifications use three separate UX layers.
+
+Toast
+For immediate short-lived feedback.
+Examples:
+
+Task created
+Changes saved
+Request submitted
+Review completed
+Upload failed
+Notification Center
+Persistent in-app notifications.
+Accessible from the notification bell.
+Unread notifications should be visually distinct.
+
+Email
+Email is a backend communication channel for important events.
+The frontend may configure notification preferences where the API supports it.
+Do not treat email and toast as the same mechanism.
+36. SignalR Realtime Behavior
+Use SignalR for realtime notification updates.
+When a meaningful realtime notification is received:
+
+update TanStack Query caches where appropriate
+update unread count
+add/update notification center content
+optionally show a toast for important events
+Do not show a toast for every realtime event.
+Avoid notification spam.
+The Notification Center remains the canonical in-app history.
+37. Notification Preferences
+The current API supports notification preference updates.
+The frontend must respect the actual API contract.
+Do not invent a read-preferences endpoint if one does not exist.
+If hydration of existing preferences is required but cannot be obtained from any existing response, report that specific API contract gap instead of fabricating stored preferences.
+38. Toast System
+Use Sonner or an equivalent lightweight toast system.
+Toast categories:
+
+success
+error
+warning
+information
+Toast content should be concise.
+Do not place full validation error dumps into toasts.
+Form-specific errors belong near the relevant form fields.
+39. Forms
+Forms are a first-class UX concern.
+Inputs should use:
+
+visible labels
+clear borders
+consistent heights
+clear focus states
+helper text where useful
+validation text
+disabled states
+read-only states
+Do not rely on placeholders as labels.
+Use React Hook Form and Zod where appropriate.
+40. Form Focus States
+Keyboard focus must be visible.
+Interactive inputs should use a subtle but clearly visible focus ring.
+Focus treatment may use:
+
+brand red
+or another accessible neutral/information ring where brand red would cause semantic confusion
+Do not remove browser focus without replacing it.
+41. Form Validation
+Validation errors must include explanatory text.
+Do not communicate invalid state using only:
+
+red border
+red icon
+color
+Example:
+Incorrect:
+red input border only
+Correct:
+Deadline must be later than the current date.
+Error messaging should be concise and actionable.
+42. Server Errors
+The frontend must map API ProblemDetails responses into appropriate UX.
+Expected classes include:
+
+401 authentication
+403 authorization
+404 missing resource
+409 conflict/concurrency
+422 validation
+429 rate limit
+500 unexpected failure
+Behavior examples:
+401:
+attempt appropriate auth refresh/session handling, otherwise return to login
+403:
+show clear permission message
+404:
+show resource-not-found state
+409:
+show conflict message and provide reload/retry path
+422:
+display validation information close to relevant controls where possible
+429:
+show retry guidance without spamming retries
+500:
+show safe generic failure state
+Never show stack traces or raw internal server errors.
+43. Missing and Unknown Data
+Missing data must never make the UI appear broken.
+Use consistent representations.
+If a value is genuinely absent:
+—
+If the user should configure it:
+Not set
+If a value cannot exist yet:
+Not available yet
+Use muted text styling.
+Do not display:
+
+null
+undefined
+empty raw cells
+[object Object]
+44. Loading States
+All major data-loading surfaces require proper loading states.
+Use skeletons instead of blank pages or global spinners wherever practical.
+Examples:
+
+task table skeleton
+dashboard card skeleton
+student detail skeleton
+file list skeleton
+analytics chart skeleton
+Skeleton dimensions should approximately match final content to reduce layout shift.
+45. Empty States
+Empty states must explain what happened and, where appropriate, offer a next action.
+Bad:
+No data
+Better:
+No tasks yet.
+Create a task to begin assigning work to students.
+Create Task
+Do not show CTAs that the current role cannot perform.
+46. Error States
+Page-level failures require explicit error states.
+Include:
+
+plain-language message
+retry action when useful
+navigation escape path where relevant
+Do not permanently replace an entire application shell because one widget failed.
+Dashboard widgets may fail independently where technically appropriate.
+47. Confirmation Dialogs
+Irreversible or high-impact actions require confirmation.
+Examples:
+
+delete
+revoke
+reject in sensitive workflows
+deactivate student
+delete folder
+destructive state transitions where appropriate
+Confirmation dialogs must explain the consequence.
+Do not use generic:
+Are you sure?
+without context.
+Example:
+Deactivate this student? They will no longer be available for new task assignments.
+48. Unsaved Changes Protection
+Forms with meaningful editable content must protect against accidental navigation.
+When unsaved changes exist:
+
+navigating away should warn the user where practical
+closing an edit drawer/dialog should warn where necessary
+Do not show warnings when nothing changed.
+49. Optimistic UI Rules
+Optimistic updates may be used only for low-risk reversible actions.
+Good candidates:
+
+mark notification read
+checklist completion
+lightweight comment-related updates when safe
+Critical operations should normally wait for server confirmation.
+Examples:
+
+assigning/reassigning tasks
+approving submissions
+rejecting requests
+changing settings
+deleting resources
+marketplace approval
+If an optimistic update fails, rollback must be deterministic.
+50. Command Palette
+Provide a global Command Palette.
+Shortcut:
+macOS:
+⌘K
+Windows/Linux:
+Ctrl+K
+Potential actions:
+
+search tasks
+search students
+navigate to Tasks
+navigate to Students
+open Marketplace
+open Notifications
+create task when authorized
+open relevant frequently used pages
+Do not expose unauthorized actions.
+Use accessible keyboard navigation.
+51. Global Search
+Global search should be designed as a product capability.
+However, do not invent a unified backend search endpoint.
+If no unified search API exists:
+
+Command Palette may use route navigation
+page-level search may use each domain's actual API
+cross-domain global data search should be deferred or implemented only when contractually supported
+Clearly distinguish navigation search from data search.
+52. Keyboard Navigation
+The application should support efficient keyboard use.
+Minimum:
+
+Tab navigation
+visible focus
+Escape for dismissible overlays
+Enter/Space activation where appropriate
+arrow-key navigation for menus/command palette
+Optional productivity shortcuts may include:
+
+/ focus search
+N new task where contextually safe
+navigation shortcuts
+Do not override common browser shortcuts.
+Keyboard shortcuts must be discoverable if they are implemented.
+53. Accessibility
+Target WCAG-conscious implementation.
+At minimum:
+
+semantic HTML
+proper labels
+accessible names
+keyboard navigation
+visible focus
+sufficient contrast
+ARIA only when needed
+accessible dialogs
+accessible menus
+accessible tables
+accessible notification announcements where appropriate
+Color must never be the only carrier of meaning.
+Icons without visible text must have accessible labels/tooltips where needed.
+54. Data Tables
+Tables should be used where structured comparison matters.
+Tables should support:
+
+proper column hierarchy
+responsive handling
+loading skeleton
+empty state
+sorting/filtering where supported
+row actions
+pagination consistent with backend pagination
+Avoid excessive horizontal scrolling on standard laptop widths.
+Secondary data may move into expandable detail or drawer.
+55. Pagination
+Use the canonical backend pagination contract:
+
+items
+page
+pageSize
+totalCount
+totalPages
+hasNextPage
+hasPreviousPage
+Do not invent a separate frontend pagination shape.
+URL query parameters should reflect important list state where useful.
+For example:
+?page=2&status=IN_PROGRESS
+This improves shareability and back-button behavior.
+56. Filters
+Filters should be easy to understand and reset.
+Provide:
+
+active filter indicators
+clear-all
+meaningful defaults
+Do not hide active filters.
+Use dropdowns/popovers/drawers depending on available space.
+On mobile, filters may move into a filter drawer.
+57. Search UX
+Search fields should use debounce where appropriate.
+Do not request on every keystroke without control.
+Search state should remain stable during pagination/filter changes where expected.
+Loading a new result set should not cause large layout jumps.
+58. Analytics
+Analytics must be useful, not decorative.
+Potential sections:
+
+task status distribution
+tasks by category
+workload
+request trends
+completion trends where data supports it
+Charts should use a restrained palette.
+Prefer:
+
+charcoal
+muted red
+warm gray
+muted blue
+muted green
+Avoid rainbow charts.
+Every chart should have:
+
+title
+understandable labels
+tooltip where useful
+empty state
+loading state
+Use accessible labels and textual summaries where appropriate.
+59. Audit Logs
+Audit Logs should favor clarity over decoration.
+Use a technical but readable table.
+Useful filters:
+
+actor
+entity
+action
+date
+result where supported
+Open detailed metadata in a drawer or detail view.
+Do not expose secrets or sensitive internal values.
+60. Settings
+Settings should be grouped by concept rather than shown as one long form.
+Possible groups:
+
+General
+Task Management
+Marketplace
+Notifications
+Security
+Data / Export
+Only show settings that actually exist in the API.
+Do not invent configuration controls.
+61. Templates
+Templates should make recurring task creation easier.
+A template should visually communicate:
+
+title
+category
+estimated duration
+relevant metadata
+Provide:
+
+create
+edit
+delete
+create task from template
+where permitted.
+62. Recurring Tasks
+Recurring Tasks should clearly show:
+
+task/template context
+recurrence
+active/inactive status
+useful next-occurrence information where available
+Do not calculate or display recurrence guarantees that disagree with backend scheduling rules.
+Backend remains authoritative.
+63. Exports
+Export operations are asynchronous/durable.
+Frontend should reflect lifecycle states such as:
+
+queued
+processing
+completed
+failed
+expired
+Do not pretend export generation is synchronous.
+Users should be able to:
+
+create export
+view previous exports
+inspect current status
+download completed export
+where authorized.
+Use polling or another controlled refresh mechanism if realtime export completion is not exposed.
+64. Responsive Strategy
+Primary target:
+desktop/laptop.
+The application must still remain usable on:
+
+tablet
+mobile
+Do not compromise the desktop operational experience in order to force a mobile-first layout.
+Responsive behavior examples:
+Desktop sidebar:
+persistent/collapsible
+Mobile sidebar:
+drawer
+Desktop task detail:
+multi-column
+Mobile task detail:
+stacked sections
+Desktop tables:
+full table
+Mobile:
+responsive condensed view, card representation, or controlled horizontal scroll depending on content
+Desktop filters:
+toolbar/popover
+Mobile filters:
+drawer/sheet
+65. Notification Drawer
+The notification bell should open a lightweight notification drawer/popover.
+Notifications may be grouped by:
+
+Today
+Yesterday
+Earlier
+Unread state should be subtle but obvious.
+Use a small unread dot or stronger text weight.
+Do not use large bright-red notification cards.
+Provide navigation to the related resource when possible.
+66. Realtime Cache Updates
+SignalR events should integrate with TanStack Query intentionally.
+Possible actions:
+
+invalidate relevant query
+update notification count
+append notification
+update detail cache if event contract makes this safe
+Do not call invalidateQueries() globally for every event.
+Avoid unnecessary network storms.
+67. TanStack Query Conventions
+Use TanStack Query as the canonical server-state layer.
+Do not duplicate server data into broad global stores without a specific need.
+Queries should have centralized keys.
+Example conceptual structure:
+queryKeys.tasks.list(...)
+queryKeys.tasks.detail(id)
+queryKeys.students.detail(id)
+Mutations should invalidate/update only relevant cache entries.
+Do not fetch the same resource independently in many components when shared query hooks can be used.
+68. Client State
+Keep client-only state separate from server state.
+Examples of client-only state:
+
+sidebar collapsed state
+open drawer
+selected view mode
+temporary filter UI
+command palette state
+Do not mirror entire backend entities into a global frontend store unnecessarily.
+69. API Client
+Create one canonical API client layer.
+Responsibilities:
+
+base URL
+auth token handling
+refresh flow
+request serialization
+ProblemDetails parsing
+cancellation where useful
+standard headers
+Do not call raw fetch() independently throughout page components.
+Do not duplicate authentication refresh logic.
+70. Authentication UX
+The authentication experience must support:
+
+login
+refresh
+logout
+invitation acceptance
+forgot password
+reset password
+After authentication failure:
+
+avoid infinite refresh loops
+clear invalid auth state safely
+redirect to login when appropriate
+Do not persist secrets unnecessarily.
+Follow current backend token/session design.
+71. Session Management
+Where session-management UI is exposed:
+
+list sessions
+revoke individual session
+revoke other/all supported sessions
+High-impact session revocation should have clear confirmation where appropriate.
+72. Security UX
+Frontend must not expose privileged actions merely because a route exists.
+Sensitive operations should require:
+
+valid role
+valid state
+explicit user intent
+Do not store confidential information in:
+
+console logs
+localStorage unnecessarily
+toast content
+URLs
+Avoid logging:
+
+tokens
+signed file URLs
+reset tokens
+invitation tokens
+73. No Permanent Mock Data
+Temporary development fixtures are acceptable only during isolated UI construction.
+Before a workflow is considered complete:
+
+use real API data
+implement loading state
+implement empty state
+implement error state
+Do not leave hardcoded production-looking data embedded in finished screens.
+74. Frontend Architecture
+The frontend should be organized into reusable layers.
+Suggested structure:
+
+frontend/src/
+  app/
+  routes/
+  components/
+    ui/
+    layout/
+    tasks/
+    students/
+    files/
+    notifications/
+  features/
+    auth/
+    tasks/
+    students/
+    marketplace/
+    requests/
+    submissions/
+    schedules/
+    availability/
+    files/
+    announcements/
+    notifications/
+    templates/
+    recurring-tasks/
+    analytics/
+    audit/
+    settings/
+    exports/
+    feedback/
+  lib/
+    api/
+    auth/
+    query/
+    validation/
+    utils/
+  hooks/
+  types/
+Exact folder names may adapt to the existing project structure.
+Do not create architecture churn solely to match this example.
+75. Shared UI Components
+Create reusable primitives instead of page-specific duplicates.
+At minimum consider:
+
+Button
+IconButton
+Input
+Textarea
+Select
+Checkbox
+Radio
+Date/DateTime input
+Badge
+StatusBadge
+Card
+DataTable
+Pagination
+Dialog
+AlertDialog
+Drawer
+DropdownMenu
+Tooltip
+Skeleton
+EmptyState
+ErrorState
+Tabs
+Breadcrumb
+PageHeader
+Toast integration
+FormField
+SearchInput
+Filter controls
+76. Domain Components
+Use domain-specific components where reuse improves consistency.
+Examples:
+Tasks:
+
+TaskCard
+TaskRow
+TaskStatusBadge
+TaskFilters
+TaskPreviewDrawer
+TaskActivityTimeline
+AssignmentPanel
+Checklist
+CommentThread
+Students:
+
+StudentCard
+StudentRow
+SkillChip
+WorkloadIndicator
+AvailabilityIndicator
+StudentPreviewDrawer
+Files:
+
+FileRow
+FolderRow
+UploadProgress
+Notifications:
+
+NotificationItem
+NotificationDrawer
+Do not force abstraction when a component is truly one-off.
+77. Icons
+Use Lucide consistently.
+Do not mix multiple icon libraries unless there is a strong reason.
+Icons should generally support text rather than replace it.
+Use recognizable icons for:
+
+search
+add
+filter
+edit
+more actions
+notifications
+files
+calendar
+settings
+analytics
+Avoid decorative icons without functional meaning.
+78. Microinteractions
+Interactions should feel responsive but restrained.
+Good examples:
+
+subtle hover state
+button pressed state
+drawer transition
+dropdown transition
+skeleton loading
+toast entrance
+selected row state
+Avoid:
+
+bouncing
+large scaling
+dramatic spring animations
+long transition durations
+Operational speed is more important than animation spectacle.
+79. Motion Accessibility
+Respect reduced-motion preferences.
+Animations must not be required to understand state.
+Use short durations.
+80. URL and Navigation State
+Where meaningful, preserve state in the URL.
+Examples:
+
+active filters
+page number
+selected tab
+selected entity where appropriate
+This allows:
+
+refresh persistence
+browser back/forward
+sharable links
+Do not encode sensitive information into query parameters.
+81. Breadcrumbs
+Use breadcrumbs only where they clarify hierarchy.
+Examples:
+Tasks / Website Update
+Students / Özge İnan
+Files / Department / Reports
+Do not add breadcrumbs to every page mechanically.
+82. Date and Time
+
+Backend persists UTC.
+
+Frontend displays user-facing date/time in:
+
+Europe/Istanbul
+
+unless another explicit product requirement overrides it.
+
+Use consistent date formatting.
+
+Do not accidentally display raw UTC timestamps.
+
+Relative time may be used for secondary information:
+
+5 minutes ago
+
+but exact timestamp should remain available where operationally important.
+
+Explicit Timezone Handling
+
+Do not rely on the end user's browser timezone for application display.
+
+All user-facing application timestamps must be explicitly rendered in:
+
+Europe/Istanbul
+
+regardless of the operating system, browser, device, or physical timezone of the end user.
+
+Use one centralized date/time utility for:
+
+parsing backend timestamps
+timezone conversion
+date formatting
+time formatting
+relative-time formatting
+deadline comparison
+calendar rendering
+date grouping
+date range calculations
+
+Use a timezone-aware implementation such as:
+
+date-fns with date-fns-tz
+
+or
+
+dayjs with the required UTC and timezone plugins
+
+Choose one approach and use it consistently across the application.
+
+Do not introduce multiple competing date libraries without a strong technical reason.
+
+Do not scatter raw:
+
+new Date(...).toLocaleString()
+
+calls throughout components unless the shared date utility intentionally uses it with an explicitly defined timezone.
+
+Do not rely on implicit browser-local conversion.
+
+All parsing, formatting, relative-time display, calendar rendering, deadline comparisons, and date grouping must follow the same centralized timezone rules.
+
+Frontend date/time logic must distinguish between:
+
+UTC timestamps received from the backend
+absolute instants in time
+date-only values
+time-only values where applicable
+local Europe/Istanbul date/time values
+
+UTC timestamps received from the backend must be interpreted as UTC and converted explicitly for presentation.
+
+Do not strip timezone information from backend timestamps before parsing.
+
+Date-Only Values
+
+Date-only values must not be treated as arbitrary UTC timestamps.
+
+For values representing a calendar date rather than an instant in time, preserve the intended calendar date.
+
+Do not convert a date-only value through UTC in a way that can shift it to the previous or next calendar day.
+
+For example, a value conceptually representing:
+
+2026-08-11
+
+must remain August 11 in the UI and must not become August 10 or August 12 because of timezone conversion.
+
+Deadlines and Comparisons
+
+Deadline calculations must use the canonical timezone rules.
+
+Do not determine:
+
+overdue
+due today
+due tomorrow
+upcoming
+current day grouping
+
+using the browser's implicit local timezone.
+
+These comparisons must be deterministic for the application timezone.
+
+For user-facing operational rules, the relevant local timezone is:
+
+Europe/Istanbul
+
+unless the backend provides an already-authoritative status that should be displayed directly.
+
+If the backend already determines a canonical state such as OVERDUE, do not independently contradict that state with a different frontend timezone calculation.
+
+Calendar Behavior
+
+Scheduling and availability screens must use the same centralized timezone handling.
+
+Calendar boundaries such as:
+
+day start
+day end
+week start
+selected date
+event placement
+
+must not change merely because the user opens the application from another country or a browser configured to another timezone.
+
+Relative Time
+
+Relative timestamps such as:
+
+5 minutes ago
+
+may use the current instant for calculation but must still represent the same underlying UTC instant correctly.
+
+Where operational precision matters, provide access to the exact formatted Europe/Istanbul timestamp as well.
+
+Testing
+
+Timezone-sensitive frontend utilities should be testable independently of the developer machine's local timezone.
+
+At minimum, critical date/time behavior should be verified against scenarios where the runtime/browser timezone is not Europe/Istanbul.
+
+The application must produce the same intended Istanbul-facing result regardless of the test machine's timezone.
+83. Internationalization Readiness
+The initial UI may use one primary language if that is the product decision.
+However:
+
+avoid hardcoding formatting logic
+centralize common labels where practical
+keep date/time formatting utilities reusable
+Do not build a complete i18n system unless explicitly required.
+84. Accessibility of Tables and Charts
+Tables require semantic table markup where applicable.
+Charts must not be the only representation of critical information.
+For important metrics, provide textual values alongside visualization.
+85. Destructive Dropdown Actions
+Destructive actions inside a context menu should:
+
+appear separated from normal actions
+use destructive text/icon styling
+open confirmation when consequence is meaningful
+Do not place destructive actions adjacent to common actions without separation.
+86. Selection and Bulk Operations
+The UI architecture may support row selection.
+However, bulk mutations must only be implemented when the backend safely supports the required behavior.
+Do not loop dozens of individual destructive API requests merely to simulate unsupported bulk semantics without explicit product approval.
+Selection may still be useful for:
+
+viewing
+exporting where supported
+future extensibility
+87. Search, Filters, and Saved View Behavior
+List screens should maintain predictable state transitions.
+Changing a major filter should normally reset pagination to page 1.
+Search/filter state should not unexpectedly disappear when opening and closing detail drawers.
+Saved predefined views should map to deterministic filter combinations.
+88. Role-Specific Experience
+Use one consistent design system across all roles.
+Do not build completely separate applications for:
+
+STUDENT
+REVIEWER
+TASK_MANAGER
+ADMIN
+Instead, adapt:
+
+navigation
+primary actions
+available controls
+dashboard emphasis
+workflow queues
+Examples:
+STUDENT:
+focus on assigned work, marketplace, requests, files, announcements
+REVIEWER:
+focus on review queue and submissions
+TASK_MANAGER:
+focus on task assignment, workforce, marketplace, schedules
+ADMIN:
+full operational and administrative access
+Exact permissions remain backend-authoritative.
+89. Student Home Experience
+For students, Dashboard/My Work should prioritize:
+
+current tasks
+upcoming deadlines
+revision requests
+marketplace opportunities
+request decisions
+important announcements
+Avoid showing irrelevant administrative analytics.
+90. Staff Home Experience
+For staff roles, Dashboard should prioritize:
+
+workload
+unassigned tasks
+overdue work
+pending requests
+pending reviews where role allows
+marketplace claims
+operational alerts
+91. Review Queue UX
+Reviews should make next action obvious.
+The reviewer should not have to navigate through multiple unrelated pages to understand one submission.
+Provide nearby access to:
+
+task context
+student
+submission version
+files
+previous review information where available
+92. Marketplace Claim UX
+Claim status must be explicit.
+Possible user-visible states:
+
+Available
+Claimed / Pending Approval
+Approved
+Rejected
+Cancelled
+Expired where supported
+Use actual backend state names/semantics.
+Do not invent unsupported lifecycle states.
+93. Announcement Email UX
+If announcement email delivery is supported by the existing API/workflow, the UI may provide a clear option such as:
+Send email notification
+Do not add such a toggle unless the backend contract actually supports triggering that behavior.
+If the desired workflow is unsupported, report the missing backend capability.
+94. Email Notifications
+Email is intended for important events rather than every interaction.
+Examples of events that may warrant email where backend behavior supports them:
+
+invitation
+password reset
+task assignment
+significant deadline reminder
+request decision
+submission revision request
+submission approval
+marketplace claim decision
+important announcement
+Minor events such as routine checklist activity should normally remain in-app unless configured otherwise.
+Frontend must not directly send arbitrary email by bypassing backend notification infrastructure.
+95. Performance
+Avoid unnecessary rendering and over-fetching.
+Use:
+
+route-level code splitting where appropriate
+query caching
+lazy loading for expensive screens
+pagination
+controlled prefetching
+memoization only where it provides measurable value
+Do not prematurely optimize every component.
+Do not fetch all backend data on initial application load.
+96. Route-Level Loading
+Large sections may use route-level lazy loading.
+Application shell should remain stable during route transitions.
+Avoid full-page flashes.
+97. Error Boundaries
+Use suitable React error boundaries for unexpected rendering failures.
+A single widget failure should not necessarily crash the whole application.
+Provide recovery/reload paths.
+98. Testing Expectations
+Frontend code should be testable.
+At minimum, important logic/workflows should support automated testing.
+Priority areas:
+
+authentication handling
+role-based rendering
+task lifecycle actions
+request actions
+review authorization UX
+form validation
+API ProblemDetails mapping
+notification state
+critical dialogs
+Do not test implementation details unnecessarily.
+99. Type Safety
+Use generated or manually maintained API types consistently.
+Avoid pervasive:
+any
+Use enum/string unions that reflect actual API values.
+Frontend status names must match backend serialization exactly.
+Do not silently map fictional status names.
+100. API/OpenAPI Authority
+The runtime OpenAPI document is the integration authority.
+Before implementing a frontend workflow:
+
+verify endpoint
+method
+request schema
+response schema
+authorization expectations
+enum serialization
+Do not rely solely on old handwritten API documentation if runtime OpenAPI differs.
+If the runtime contract and specification conflict, report the conflict instead of silently choosing one.
+101. No Backend Redesign During Frontend Work
+Frontend implementation must not casually modify backend architecture.
+If a genuine integration gap appears:
+
+identify the exact user workflow
+identify the exact missing backend contract
+report it
+make the smallest coherent backend change only when explicitly part of the requested task
+Do not create speculative endpoints for UI convenience.
+102. Design Consistency Rule
+Once the shared design system exists, all later pages must reuse it.
+Do not independently invent:
+
+new button styles
+new card styles
+new spacing systems
+new red colors
+new badge semantics
+new modal designs
+without a product requirement.
+The application should visibly feel like one product.
+103. Final Frontend Design Definition
+The final interface should be understood as:
+A modern, production-grade operational SaaS workforce platform using a charcoal navigation shell, warm off-white workspace, clean white surfaces, restrained institutional red accents, distinct destructive semantics, compact but breathable information density, accessible forms, contextual actions, realtime feedback, and workflow-first composition of backend capabilities.
+The interface must feel calm even when displaying complex operational information.
+Usability and information hierarchy take priority over decoration.
+104. Mandatory Product Enhancements
+The following product enhancements are part of the intended frontend experience:
+
+Command Palette
+predefined Saved Task Views
+Task Activity Timeline
+Quick Preview Drawers
+Smart Attention System
+skeleton loading states
+actionable empty states
+contextual ellipsis menus
+accessible form states
+toast feedback
+notification center
+SignalR realtime updates
+unsaved-change protection
+appropriate confirmation dialogs
+safe optimistic updates
+role-aware navigation and actions
+These should be integrated naturally into the architecture rather than added as isolated visual gimmicks.
+105. Implementation Order
+Do not implement the entire frontend in one uncontrolled pass.
+Use staged implementation.
+Recommended sequence:
+
+Phase 1 — Frontend Foundation
+TypeScript/Vite setup
+Tailwind
+routing
+environment handling
+API client foundation
+query client
+auth foundation
+design tokens
+typography
+shared color tokens
+Phase 2 — Design System and App Shell
+buttons
+inputs
+forms
+badges
+status system
+dialogs
+drawers
+dropdown menus
+tooltips
+skeletons
+empty/error states
+sidebar
+topbar
+responsive shell
+toast system
+command palette shell
+Phase 3 — Authentication and Core Data Integration
+login
+invitation acceptance
+password flows
+session handling
+role-aware routes
+ProblemDetails integration
+Phase 4 — Primary Operational Workflows
+Dashboard
+Tasks
+Task Detail
+Focus Mode
+Students
+Student Detail
+Marketplace
+Phase 5 — Workforce and Content Workflows
+Schedule
+Availability
+Requests
+Reviews
+Files
+Announcements
+Notifications
+Phase 6 — Productivity and Administrative Workflows
+Templates
+Recurring Tasks
+Analytics
+Audit Logs
+Settings
+Exports
+Feedback surfaces
+Phase 7 — Product Enhancements
+Smart Attention refinement
+Quick Preview Drawers
+Activity Timeline polish
+predefined Saved Task Views
+Command Palette actions
+realtime cache integration
+Phase 8 — Final Hardening
+responsive behavior
+accessibility audit
+loading/empty/error audit
+authorization UI audit
+keyboard navigation
+performance
+frontend tests
+API contract audit
+removal of temporary mock data
+Do not proceed by generating all screens simultaneously.
+Each phase should leave the application in a coherent, runnable state. nasıl eksik var mı
 ------------------------------------------------------------------------
 
 # 62. INTERNATIONALIZATION PREPARATION

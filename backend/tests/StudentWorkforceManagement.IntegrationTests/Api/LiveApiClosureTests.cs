@@ -80,6 +80,51 @@ public sealed class LiveApiClosureTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Refresh_returns_new_access_token_rotates_refresh_token_and_rejects_reuse()
+    {
+        await using var factory = await TestApiFactory.CreateInitializedAsync();
+        using var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+
+        var login = await anonymous.PostAsJsonAsync("/api/v1/auth/login", new { email = "admin@example.edu", password = "Correct1!", deviceName = "refresh-test" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        using var loginJson = await ReadJsonAsync(login);
+        var firstAccessToken = loginJson.RootElement.GetProperty("accessToken").GetString();
+        var firstRefreshToken = loginJson.RootElement.GetProperty("refreshToken").GetString();
+        var sessionId = loginJson.RootElement.GetProperty("sessionId").GetGuid();
+        Assert.False(string.IsNullOrWhiteSpace(firstAccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(firstRefreshToken));
+        Assert.Equal(factory.UserSessionId("admin@example.edu", "refresh-test"), sessionId);
+
+        using var firstAccess = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        firstAccess.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", firstAccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await firstAccess.GetAsync("/api/v1/skills")).StatusCode);
+
+        var refresh = await anonymous.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = firstRefreshToken });
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        using var refreshJson = await ReadJsonAsync(refresh);
+        var secondAccessToken = refreshJson.RootElement.GetProperty("accessToken").GetString();
+        var secondRefreshToken = refreshJson.RootElement.GetProperty("refreshToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(secondAccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(secondRefreshToken));
+        Assert.NotEqual(firstRefreshToken, secondRefreshToken);
+        Assert.Equal(sessionId, refreshJson.RootElement.GetProperty("sessionId").GetGuid());
+        Assert.True(refreshJson.RootElement.TryGetProperty("accessTokenExpiresAt", out var accessTokenExpiresAt));
+        Assert.Equal(JsonValueKind.String, accessTokenExpiresAt.ValueKind);
+
+        using var refreshedAccess = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        refreshedAccess.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secondAccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await refreshedAccess.GetAsync("/api/v1/skills")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await anonymous.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = firstRefreshToken })).StatusCode);
+
+        var secondRefresh = await anonymous.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = secondRefreshToken });
+        Assert.Equal(HttpStatusCode.OK, secondRefresh.StatusCode);
+        using var secondRefreshJson = await ReadJsonAsync(secondRefresh);
+        Assert.False(string.IsNullOrWhiteSpace(secondRefreshJson.RootElement.GetProperty("accessToken").GetString()));
+        Assert.NotEqual(secondRefreshToken, secondRefreshJson.RootElement.GetProperty("refreshToken").GetString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Role_enforcement_and_idor_boundaries_are_enforced_over_http()
     {
         await using var factory = await TestApiFactory.CreateInitializedAsync();
@@ -242,6 +287,10 @@ public sealed class LiveApiClosureTests
         using var anonymous = factory.CreateClient();
         var openApi = await anonymous.GetStringAsync("/openapi/v1.json");
         Assert.Contains("\"bearerAuth\"", openApi);
+        Assert.Contains("\"/api/v1/auth/refresh\"", openApi);
+        Assert.Contains("\"accessTokenExpiresAt\"", openApi);
+        Assert.Contains("\"refreshTokenExpiresAt\"", openApi);
+        Assert.Contains("\"sessionId\"", openApi);
         Assert.Contains("\"/api/v1/tasks/{id}/start\"", openApi);
         Assert.Contains("\"/api/v1/tasks/{taskId}/feedback\"", openApi);
         Assert.Contains("\"/api/v1/students/{studentId}/feedback\"", openApi);
@@ -575,7 +624,17 @@ public sealed class LiveApiClosureTests
                 SigningKey = signingKey,
                 AccessTokenMinutes = accessTokenMinutes
             }));
-            return tokenService.CreateAccessToken(user, new[] { user.Role!.Name.ToString() }, sessionId);
+            return tokenService.CreateAccessToken(user, new[] { user.Role!.Name.ToString() }, sessionId).Token;
+        }
+
+        public Guid UserSessionId(string email, string deviceName)
+        {
+            using var scope = Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return dbContext.Sessions
+                .Include(session => session.User)
+                .Single(session => session.User!.Email == email && session.DeviceName == deviceName && session.RevokedAt == null)
+                .Id;
         }
 
         public async Task RunExportJobAsync(Guid exportRequestId)

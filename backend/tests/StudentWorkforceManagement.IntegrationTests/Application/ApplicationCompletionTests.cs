@@ -126,19 +126,56 @@ public sealed class ApplicationCompletionTests
         var tokenGenerator = new FakeTokenGenerator("new-refresh-token");
         context.RefreshTokens.Add(new RefreshToken { Id = Guid.NewGuid(), SessionId = session.Id, TokenHash = tokenGenerator.HashToken("old-refresh-token"), ExpiresAt = DateTimeOffset.UtcNow.AddDays(7) });
         await context.SaveChangesAsync();
-        var handler = new SessionCommandHandler(context, new FakeCurrentUser(userId, null, UserRole.STUDENT), tokenGenerator, new FakeClock());
+        var role = new Role { Id = Guid.NewGuid(), Name = UserRole.STUDENT };
+        var user = new User { Id = userId, Email = "refresh@example.com", DisplayName = "Refresh User", RoleId = role.Id, Role = role, IsActive = true };
+        context.Roles.Add(role);
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+        var handler = new SessionCommandHandler(context, new FakeCurrentUser(userId, null, UserRole.STUDENT), tokenGenerator, new FakeAccessTokenService(), new FakeClock());
 
         var rotated = await handler.Handle(new RefreshTokenCommand("old-refresh-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None);
         await context.SaveChangesAsync();
 
         Assert.Equal(session.Id, rotated.SessionId);
+        Assert.Equal("access-token", rotated.AccessToken);
+        Assert.Equal("new-refresh-token", rotated.RawRefreshToken);
         Assert.Equal(2, context.RefreshTokens.Count());
         Assert.NotNull(context.RefreshTokens.Single(token => token.TokenHash == tokenGenerator.HashToken("old-refresh-token")).ReplacedAt);
-        await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new RefreshTokenCommand("old-refresh-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("old-refresh-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new LogoutCommand(context.Sessions.Single(item => item.UserId == otherUserId).Id), CancellationToken.None));
         await handler.Handle(new LogoutCommand(session.Id), CancellationToken.None);
         Assert.NotNull(session.RevokedAt);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Refresh_rejects_invalid_expired_revoked_session_and_inactive_user_safely()
+    {
+        await using var context = CreateContext();
+        var role = new Role { Id = Guid.NewGuid(), Name = UserRole.STUDENT };
+        var activeUser = new User { Id = Guid.NewGuid(), Email = "active-refresh@example.com", DisplayName = "Active Refresh", RoleId = role.Id, Role = role, IsActive = true };
+        var inactiveUser = new User { Id = Guid.NewGuid(), Email = "inactive-refresh@example.com", DisplayName = "Inactive Refresh", RoleId = role.Id, Role = role, IsActive = false };
+        var activeSession = new Session { Id = Guid.NewGuid(), UserId = activeUser.Id, ExpiresAt = DateTimeOffset.UtcNow.AddDays(1) };
+        var revokedSession = new Session { Id = Guid.NewGuid(), UserId = activeUser.Id, ExpiresAt = DateTimeOffset.UtcNow.AddDays(1), RevokedAt = DateTimeOffset.UtcNow };
+        var expiredSession = new Session { Id = Guid.NewGuid(), UserId = activeUser.Id, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5) };
+        var inactiveUserSession = new Session { Id = Guid.NewGuid(), UserId = inactiveUser.Id, ExpiresAt = DateTimeOffset.UtcNow.AddDays(1) };
+        var tokenGenerator = new FakeTokenGenerator("new-refresh-token");
+        context.Roles.Add(role);
+        context.Users.AddRange(activeUser, inactiveUser);
+        context.Sessions.AddRange(activeSession, revokedSession, expiredSession, inactiveUserSession);
+        context.RefreshTokens.AddRange(
+            new RefreshToken { Id = Guid.NewGuid(), SessionId = activeSession.Id, TokenHash = tokenGenerator.HashToken("expired-token"), ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5) },
+            new RefreshToken { Id = Guid.NewGuid(), SessionId = revokedSession.Id, TokenHash = tokenGenerator.HashToken("revoked-session-token"), ExpiresAt = DateTimeOffset.UtcNow.AddDays(7) },
+            new RefreshToken { Id = Guid.NewGuid(), SessionId = expiredSession.Id, TokenHash = tokenGenerator.HashToken("expired-session-token"), ExpiresAt = DateTimeOffset.UtcNow.AddDays(7) },
+            new RefreshToken { Id = Guid.NewGuid(), SessionId = inactiveUserSession.Id, TokenHash = tokenGenerator.HashToken("inactive-user-token"), ExpiresAt = DateTimeOffset.UtcNow.AddDays(7) });
+        await context.SaveChangesAsync();
+        var handler = new SessionCommandHandler(context, new FakeCurrentUser(activeUser.Id, null, UserRole.STUDENT), tokenGenerator, new FakeAccessTokenService(), new FakeClock());
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("missing-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("expired-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("revoked-session-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("expired-session-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
+        await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new RefreshTokenCommand("inactive-user-token", DateTimeOffset.UtcNow.AddDays(8)), CancellationToken.None));
     }
 
     [Fact]
@@ -295,7 +332,7 @@ public sealed class ApplicationCompletionTests
 
     private sealed class FakeAccessTokenService : IAccessTokenService
     {
-        public string CreateAccessToken(User user, IReadOnlyCollection<string> roles, Guid sessionId) => "access-token";
+        public AccessTokenResult CreateAccessToken(User user, IReadOnlyCollection<string> roles, Guid sessionId) => new("access-token", DateTimeOffset.UtcNow.AddMinutes(15));
     }
 
     private sealed class FakeFileStorage : IFileStorage

@@ -1,16 +1,40 @@
+# macOS metadata
 .DS_Store
+**/.DS_Store
+
+# Environment files
 .env
+.env.local
+.env.development
+.env.production
 .env.*
 !.env.example
+!**/.env.example
+
+# .NET build and test artifacts
 bin/
 obj/
 TestResults/
-.vs/
-.vscode/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# Frontend dependencies and build output
 node_modules/
 dist/
-coverage/
-.tmp/
+
+# IDE/editor metadata
+.vs/
+.vscode/
+.idea/
 *.user
 *.suo
+
+# Logs and temporary files
 *.log
+logs/
+.tmp/
+tmp/
+temp/
+*.tmp

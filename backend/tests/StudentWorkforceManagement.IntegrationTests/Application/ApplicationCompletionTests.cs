@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StudentWorkforceManagement.Application.Analytics.Queries;
 using StudentWorkforceManagement.Application.Auth.Commands;
 using StudentWorkforceManagement.Application.Auth.Services;
@@ -11,6 +12,7 @@ using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Files.Commands;
+using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Application.Students.Queries;
 using StudentWorkforceManagement.Application.Submissions.Commands.CompleteSubmissionUpload;
 using StudentWorkforceManagement.Application.Tasks.Services;
@@ -156,7 +158,7 @@ public sealed class ApplicationCompletionTests
     {
         await using var context = CreateContext();
         var storage = new FakeFileStorage();
-        var handler = new FileCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN), storage, new FakeClock());
+        var handler = new FileCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN), storage, CreateUploadPolicy(), new FakeClock());
 
         var initiated = await handler.Handle(new InitiateDepartmentFileUploadCommand(null, "report.pdf", 4096, "application/pdf", ".pdf", "abc123"), CancellationToken.None);
         storage.Metadata[initiated.StorageKey] = new StoredFileMetadata(initiated.StorageKey, 4096, "application/pdf", "abc123");
@@ -172,6 +174,20 @@ public sealed class ApplicationCompletionTests
         Assert.Single(context.DepartmentFiles);
     }
 
+    [Fact]
+    public void Upload_policy_allows_required_user_file_types_and_blocks_executables()
+    {
+        var policy = CreateUploadPolicy();
+
+        Assert.Equal(".docx", policy.ValidatePendingUpload("brief.docx", 1024, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx").FileExtension);
+        Assert.Equal(".odt", policy.ValidatePendingUpload("brief.odt", 1024, "application/vnd.oasis.opendocument.text", ".odt").FileExtension);
+        Assert.Equal(".json", policy.ValidatePendingUpload("payload.json", 1024, "application/json", ".json").FileExtension);
+        Assert.Equal(".webp", policy.ValidatePendingUpload("image.webp", 1024, "image/webp", ".webp").FileExtension);
+
+        Assert.Throws<ConflictException>(() => policy.ValidatePendingUpload("installer.exe", 1024, "application/octet-stream", ".exe"));
+        Assert.Throws<ConflictException>(() => policy.ValidatePendingUpload("report.pdf", 1024, "application/msword", ".pdf"));
+    }
+
 
     [Fact]
     public async System.Threading.Tasks.Task Submission_upload_uses_server_storage_key_and_idempotent_completion()
@@ -184,7 +200,7 @@ public sealed class ApplicationCompletionTests
         context.Tasks.Add(task);
         await context.SaveChangesAsync();
         var storage = new FakeFileStorage();
-        var handler = new CompleteSubmissionUploadCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), student.Id, UserRole.STUDENT), storage, new FakeClock());
+        var handler = new CompleteSubmissionUploadCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), student.Id, UserRole.STUDENT), storage, CreateUploadPolicy(), new FakeClock());
 
         var initiated = await handler.Handle(new InitiateSubmissionUploadCommand(task.Id, "deliverable.pdf", 2048, "application/pdf", ".pdf", "hash-1"), CancellationToken.None);
         await context.SaveChangesAsync();
@@ -199,6 +215,11 @@ public sealed class ApplicationCompletionTests
         Assert.Equal(FileStatus.CONFIRMED, completed.FileStatus);
         Assert.Equal(completed.Id, completedAgain.Id);
         Assert.Single(context.SubmissionVersions);
+    }
+
+    private static IUploadFilePolicy CreateUploadPolicy()
+    {
+        return new UploadFilePolicy(Options.Create(new UploadFilePolicyOptions()));
     }
 
     [Fact]
@@ -287,5 +308,9 @@ public sealed class ApplicationCompletionTests
             Metadata.TryGetValue(storageKey, out var value);
             return System.Threading.Tasks.Task.FromResult(value);
         }
+
+        public System.Threading.Tasks.Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.CompletedTask;
+
+        public System.Threading.Tasks.Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.FromResult<Stream>(new MemoryStream());
     }
 }

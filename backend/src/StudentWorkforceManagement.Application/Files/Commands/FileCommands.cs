@@ -49,7 +49,7 @@ public sealed class InitiateDepartmentFileUploadCommandValidator : AbstractValid
     public InitiateDepartmentFileUploadCommandValidator()
     {
         RuleFor(command => command.FileName).NotEmpty().MaximumLength(255);
-        RuleFor(command => command.FileSize).InclusiveBetween(1, FilePolicy.MaxFileSizeBytes);
+        RuleFor(command => command.FileSize).InclusiveBetween(1, UploadFilePolicyOptions.OneGigabyteInBytes);
         RuleFor(command => command.MimeType).NotEmpty().MaximumLength(150);
         RuleFor(command => command.FileExtension).NotEmpty().MaximumLength(20);
         RuleFor(command => command.ContentHash).MaximumLength(128);
@@ -64,7 +64,7 @@ public sealed class FileFolderCommandValidator : AbstractValidator<CreateFileFol
     }
 }
 
-public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IFileStorage storage, IUtcClock clock)
+public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IFileStorage storage, IUploadFilePolicy uploadFilePolicy, IUtcClock clock)
     : IRequestHandler<InitiateDepartmentFileUploadCommand, FileUploadIntentDto>,
       IRequestHandler<CompleteDepartmentFileUploadCommand, DepartmentFileDto>,
       IRequestHandler<DeleteDepartmentFileCommand, Unit>,
@@ -74,13 +74,12 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
 {
     public async System.Threading.Tasks.Task<FileUploadIntentDto> Handle(InitiateDepartmentFileUploadCommand request, CancellationToken cancellationToken)
     {
-        FilePolicy.ValidateSize(request.FileSize);
-        var extension = FilePolicy.NormalizeExtension(request.FileExtension);
+        var upload = uploadFilePolicy.ValidatePendingUpload(request.FileName, request.FileSize, request.MimeType, request.FileExtension);
         if (request.FolderId.HasValue && !await dbContext.FileFolders.AnyAsync(folder => folder.Id == request.FolderId.Value, cancellationToken))
         {
             throw new NotFoundException("FileFolder", request.FolderId.Value);
         }
-        var storageKey = $"department-files/{Guid.NewGuid():N}{extension}";
+        var storageKey = $"department-files/{Guid.NewGuid():N}{upload.FileExtension}";
         var file = new DepartmentFile
         {
             Id = Guid.NewGuid(),
@@ -89,11 +88,11 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
             FileStatus = FileStatus.UPLOAD_PENDING,
             File = new FileMetadata
             {
-                FileName = request.FileName.Trim(),
+                FileName = upload.FileName,
                 StorageKey = storageKey,
-                FileSize = request.FileSize,
-                MimeType = request.MimeType.Trim(),
-                FileExtension = extension,
+                FileSize = upload.FileSizeBytes,
+                MimeType = upload.MimeType,
+                FileExtension = upload.FileExtension,
                 ContentHash = request.ContentHash
             }
         };
@@ -116,10 +115,7 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
         }
         var metadata = await storage.GetMetadataAsync(file.File.StorageKey, cancellationToken)
             ?? throw new ConflictException("Uploaded object metadata could not be verified.");
-        if (metadata.FileSizeBytes != file.File.FileSize || !string.Equals(metadata.MimeType, file.File.MimeType, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ConflictException("Uploaded object metadata does not match the pending file metadata.");
-        }
+        uploadFilePolicy.ValidateStoredObject(file.File, metadata);
         if (!string.IsNullOrWhiteSpace(file.File.ContentHash) && !string.Equals(file.File.ContentHash, metadata.ContentHash, StringComparison.OrdinalIgnoreCase))
         {
             throw new ConflictException("Uploaded object content hash does not match the pending file metadata.");

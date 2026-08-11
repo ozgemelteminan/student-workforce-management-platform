@@ -35,6 +35,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<MarketplaceClaim> MarketplaceClaims => Set<MarketplaceClaim>();
     public DbSet<FileFolder> FileFolders => Set<FileFolder>();
     public DbSet<DepartmentFile> DepartmentFiles => Set<DepartmentFile>();
+    public DbSet<ExportRequest> ExportRequests => Set<ExportRequest>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();

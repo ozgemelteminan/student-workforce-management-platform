@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using StudentWorkforceManagement.Api;
+using StudentWorkforceManagement.Api.Endpoints;
+using StudentWorkforceManagement.Api.Middleware;
 using StudentWorkforceManagement.Application;
 using StudentWorkforceManagement.Infrastructure;
 using StudentWorkforceManagement.Infrastructure.Hosting;
@@ -7,25 +10,33 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddControllers();
-builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
+builder.Services.AddApi(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
+app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseCors("Frontend");
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapInfrastructureEndpoints();
-app.MapGet("/api/v1", () => Results.Ok(new { version = "v1", status = "foundation" }))
-    .WithName("ApiV1Foundation");
+app.MapV1Api();
 
 app.Run();
 

@@ -67,7 +67,7 @@ public sealed class PasswordAuthContractHandler(
     public async System.Threading.Tasks.Task<AuthenticationResultDto> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
-        var user = await dbContext.Users.Include(entity => entity.Role).SingleOrDefaultAsync(entity => entity.Email == normalizedEmail, cancellationToken);
+        var user = await dbContext.Users.Include(entity => entity.Role).Include(entity => entity.Student).SingleOrDefaultAsync(entity => entity.Email == normalizedEmail, cancellationToken);
         if (user is null || !user.IsActive || user.DeletedAt.HasValue || string.IsNullOrWhiteSpace(user.PasswordHash) || !passwordService.VerifyPassword(user, request.Password))
         {
             throw new ForbiddenException("Invalid email or password.");

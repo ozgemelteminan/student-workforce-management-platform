@@ -22,6 +22,7 @@ using TaskRequest = StudentWorkforceManagement.Domain.Entities.TaskRequest;
 using TaskReview = StudentWorkforceManagement.Domain.Entities.TaskReview;
 using TaskSubmission = StudentWorkforceManagement.Domain.Entities.TaskSubmission;
 using DepartmentFile = StudentWorkforceManagement.Domain.Entities.DepartmentFile;
+using ExportRequest = StudentWorkforceManagement.Domain.Entities.ExportRequest;
 using Feedback = StudentWorkforceManagement.Domain.Entities.Feedback;
 using FileFolder = StudentWorkforceManagement.Domain.Entities.FileFolder;
 using Invitation = StudentWorkforceManagement.Domain.Entities.Invitation;
@@ -68,6 +69,7 @@ public interface IApplicationDbContext
     DbSet<MarketplaceClaim> MarketplaceClaims { get; }
     DbSet<FileFolder> FileFolders { get; }
     DbSet<DepartmentFile> DepartmentFiles { get; }
+    DbSet<ExportRequest> ExportRequests { get; }
     DbSet<Announcement> Announcements { get; }
     DbSet<Notification> Notifications { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }

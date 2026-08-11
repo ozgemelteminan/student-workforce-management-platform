@@ -14,6 +14,7 @@ using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
+using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Domain.Entities;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.DataExport;
@@ -113,6 +114,11 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .Validate(ValidateStorageOptions, "Invalid storage provider configuration.")
             .ValidateOnStart();
+        services.AddOptions<UploadFilePolicyOptions>()
+            .Bind(configuration.GetSection(UploadFilePolicyOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(UploadFilePolicy.ValidateOptions, "Invalid upload file policy configuration.")
+            .ValidateOnStart();
         services.AddScoped<LocalFileStorage>();
         services.AddScoped<S3FileStorage>();
         services.AddScoped<IFileStorage>(serviceProvider =>
@@ -153,6 +159,11 @@ public static class DependencyInjection
         services.AddScoped<OrphanFileCleanupJob>();
         services.AddScoped<RetentionCleanupJob>();
         services.AddScoped<DataExportJob>();
+        services.AddScoped<IExportJobScheduler, HangfireExportJobScheduler>();
+        services.AddOptions<DataExportOptions>()
+            .Bind(configuration.GetSection(DataExportOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<MarketplaceClaimExpirationJob>();
         services.AddScoped<SemesterRolloverJob>();
 

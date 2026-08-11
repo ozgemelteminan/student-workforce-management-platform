@@ -15,29 +15,29 @@ public sealed class JwtAccessTokenService(IOptions<JwtOptions> options) : IAcces
     public string CreateAccessToken(User user, IReadOnlyCollection<string> roles, Guid sessionId)
     {
         var now = DateTimeOffset.UtcNow;
-        var claims = new Dictionary<string, object>
-        {
-            [ClaimTypes.NameIdentifier] = user.Id.ToString("D"),
-            ["sub"] = user.Id.ToString("D"),
-            ["sid"] = sessionId.ToString("D"),
-            ["jti"] = Guid.NewGuid().ToString("N"),
-            ["roles"] = roles.ToArray()
-        };
-
         var header = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
         {
             ["alg"] = "HS256",
             ["typ"] = "JWT"
         }));
-        var payload = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
+        var claims = new Dictionary<string, object>
         {
             ["iss"] = _options.Issuer,
             ["aud"] = _options.Audience,
             ["iat"] = now.ToUnixTimeSeconds(),
             ["nbf"] = now.ToUnixTimeSeconds(),
             ["exp"] = now.AddMinutes(_options.AccessTokenMinutes).ToUnixTimeSeconds(),
-            ["claims"] = claims
-        }));
+            [ClaimTypes.NameIdentifier] = user.Id.ToString("D"),
+            ["sub"] = user.Id.ToString("D"),
+            ["sid"] = sessionId.ToString("D"),
+            ["role"] = roles.ToArray()
+        };
+        if (user.Student is not null)
+        {
+            claims["student_id"] = user.Student.Id.ToString("D");
+        }
+
+        var payload = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(claims));
         var unsignedToken = $"{header}.{payload}";
         var signature = Sign(unsignedToken, _options.SigningKey);
         return $"{unsignedToken}.{signature}";

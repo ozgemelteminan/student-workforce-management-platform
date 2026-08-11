@@ -12,7 +12,7 @@ Jobs are bounded and retry-safe:
 - `MarketplaceClaimExpirationJob`: expires pending claims whose expiration has passed.
 - `SemesterRolloverJob`: archives active semesters after their end date.
 - `RetentionCleanupJob`: no destructive automation until entity-specific retention/deletion/anonymization policy identifies eligible records.
-- `DataExportJob`: waits for an Application/API-owned durable export lifecycle; the Master Specification defines export surfaces and async guidance but not status/download persistence semantics.
+- `DataExportJob`: claims queued durable export requests, generates CSV/XLSX/PDF artifacts, persists completion/failure state, and stores authorized expiring download metadata.
 
 Recurring task duplicate protection is database-backed through a unique index on `(RecurringTaskId, ScheduledRunAt)`.
 

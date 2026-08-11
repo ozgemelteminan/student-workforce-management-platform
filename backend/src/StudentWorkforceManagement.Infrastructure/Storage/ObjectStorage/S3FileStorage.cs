@@ -71,4 +71,25 @@ public sealed class S3FileStorage : IFileStorage
             return null;
         }
     }
+
+    public async Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default)
+    {
+        await _client.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = _options.S3.BucketName,
+            Key = storageKey,
+            InputStream = content,
+            ContentType = mimeType
+        }, cancellationToken);
+    }
+
+    public async Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        var response = await _client.GetObjectAsync(new GetObjectRequest
+        {
+            BucketName = _options.S3.BucketName,
+            Key = storageKey
+        }, cancellationToken);
+        return response.ResponseStream;
+    }
 }

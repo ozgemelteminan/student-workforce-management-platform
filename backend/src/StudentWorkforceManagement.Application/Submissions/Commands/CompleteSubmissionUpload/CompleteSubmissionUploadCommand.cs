@@ -38,7 +38,7 @@ public sealed class InitiateSubmissionUploadCommandValidator : AbstractValidator
     {
         RuleFor(command => command.TaskId).NotEmpty();
         RuleFor(command => command.FileName).NotEmpty().MaximumLength(255);
-        RuleFor(command => command.FileSize).InclusiveBetween(1, FilePolicy.MaxFileSizeBytes);
+        RuleFor(command => command.FileSize).InclusiveBetween(1, UploadFilePolicyOptions.OneGigabyteInBytes);
         RuleFor(command => command.MimeType).NotEmpty().MaximumLength(150);
         RuleFor(command => command.FileExtension).NotEmpty().MaximumLength(20);
         RuleFor(command => command.ContentHash).MaximumLength(128);
@@ -53,7 +53,7 @@ public sealed class CompleteSubmissionUploadCommandValidator : AbstractValidator
     }
 }
 
-public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IFileStorage storage, IUtcClock clock)
+public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IFileStorage storage, IUploadFilePolicy uploadFilePolicy, IUtcClock clock)
     : IRequestHandler<InitiateSubmissionUploadCommand, SubmissionUploadIntentDto>, IRequestHandler<CompleteSubmissionUploadCommand, SubmissionVersionDto>
 {
     public async System.Threading.Tasks.Task<SubmissionUploadIntentDto> Handle(InitiateSubmissionUploadCommand request, CancellationToken cancellationToken)
@@ -70,8 +70,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             throw new ConflictException("Submissions are not allowed for cancelled or completed tasks.");
         }
 
-        FilePolicy.ValidateSize(request.FileSize);
-        var extension = FilePolicy.NormalizeExtension(request.FileExtension);
+        var upload = uploadFilePolicy.ValidatePendingUpload(request.FileName, request.FileSize, request.MimeType, request.FileExtension);
         var submission = await dbContext.TaskSubmissions.SingleOrDefaultAsync(entity => entity.TaskId == request.TaskId && entity.SubmittedById == studentId, cancellationToken);
         if (submission is null)
         {
@@ -90,7 +89,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             .Select(version => (int?)version.VersionNumber)
             .MaxAsync(cancellationToken) ?? 0;
 
-        var storageKey = $"task-submissions/{request.TaskId:N}/{Guid.NewGuid():N}{extension}";
+        var storageKey = $"task-submissions/{request.TaskId:N}/{Guid.NewGuid():N}{upload.FileExtension}";
         var version = new SubmissionVersion
         {
             Id = Guid.NewGuid(),
@@ -98,11 +97,11 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             VersionNumber = nextVersion + 1,
             File = new FileMetadata
             {
-                FileName = request.FileName.Trim(),
+                FileName = upload.FileName,
                 StorageKey = storageKey,
-                FileSize = request.FileSize,
-                MimeType = request.MimeType.Trim(),
-                FileExtension = extension,
+                FileSize = upload.FileSizeBytes,
+                MimeType = upload.MimeType,
+                FileExtension = upload.FileExtension,
                 ContentHash = request.ContentHash
             },
             FileStatus = FileStatus.UPLOAD_PENDING,
@@ -132,10 +131,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
         }
         var metadata = await storage.GetMetadataAsync(version.File.StorageKey, cancellationToken)
             ?? throw new ConflictException("Uploaded object metadata could not be verified.");
-        if (metadata.FileSizeBytes != version.File.FileSize || !string.Equals(metadata.MimeType, version.File.MimeType, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ConflictException("Uploaded object metadata does not match the pending submission metadata.");
-        }
+        uploadFilePolicy.ValidateStoredObject(version.File, metadata);
         if (!string.IsNullOrWhiteSpace(version.File.ContentHash) && !string.Equals(version.File.ContentHash, metadata.ContentHash, StringComparison.OrdinalIgnoreCase))
         {
             throw new ConflictException("Uploaded object content hash does not match the pending submission metadata.");

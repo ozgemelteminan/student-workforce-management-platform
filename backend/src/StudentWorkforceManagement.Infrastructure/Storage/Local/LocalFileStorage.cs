@@ -36,14 +36,42 @@ public sealed class LocalFileStorage(IOptions<StorageOptions> options) : IFileSt
         var extension = Path.GetExtension(path).ToLowerInvariant();
         var mimeType = extension switch
         {
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".ppt" => "application/vnd.ms-powerpoint",
+            ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".odt" => "application/vnd.oasis.opendocument.text",
+            ".ods" => "application/vnd.oasis.opendocument.spreadsheet",
+            ".odp" => "application/vnd.oasis.opendocument.presentation",
             ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
             ".txt" => "text/plain",
             ".csv" => "text/csv",
+            ".json" => "application/json",
+            ".md" => "text/markdown",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".zip" => "application/zip",
             _ => "application/octet-stream"
         };
         return Task.FromResult<StoredFileMetadata?>(new StoredFileMetadata(storageKey, info.Length, mimeType, null));
+    }
+
+    public async Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default)
+    {
+        var path = ResolvePath(storageKey);
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? _options.LocalRootPath);
+        await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 64, useAsync: true);
+        await content.CopyToAsync(output, cancellationToken);
+    }
+
+    public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        var path = ResolvePath(storageKey);
+        Stream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 64, useAsync: true);
+        return Task.FromResult(stream);
     }
 
     public string ResolvePath(string storageKey)

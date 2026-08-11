@@ -6,6 +6,7 @@ using StudentWorkforceManagement.Application.Common.Behaviors;
 using StudentWorkforceManagement.Application.Common.Events;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
+using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Application.RecurringTasks.Services;
 using StudentWorkforceManagement.Application.Tasks.Services;
 
@@ -26,6 +27,8 @@ public static class DependencyInjection
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         services.TryAddScoped<ICurrentUserService, AnonymousCurrentUserService>();
+        services.AddOptions<UploadFilePolicyOptions>();
+        services.AddScoped<IUploadFilePolicy, UploadFilePolicy>();
         services.AddScoped<IApplicationEventQueue, ApplicationEventQueue>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<INotificationIntentService, NotificationIntentService>();

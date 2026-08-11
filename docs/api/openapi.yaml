@@ -1,7 +1,369 @@
 openapi: 3.1.0
 info:
   title: Student Workforce Management Platform API
-  version: 0.1.0-foundation
+  version: 1.0.0-api-phase
 servers:
   - url: /api/v1
-paths: {}
+security:
+  - bearerAuth: []
+paths:
+  /:
+    get:
+      tags: [System]
+      security: []
+      responses:
+        "200": { description: API version root }
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      responses:
+        "200": { description: Access and refresh token pair }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      security: []
+      responses:
+        "200": { description: Rotated token pair }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      responses:
+        "204": { description: Session revoked }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      security: []
+      responses:
+        "200": { description: Reset workflow accepted }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      security: []
+      responses:
+        "200": { description: Password reset completed }
+  /invitations:
+    get:
+      tags: [Invitations]
+      responses:
+        "200": { description: Paged invitation list }
+    post:
+      tags: [Invitations]
+      responses:
+        "201": { description: Invitation created }
+  /invitations/accept:
+    post:
+      tags: [Invitations]
+      security: []
+      responses:
+        "200": { description: Invitation accepted }
+  /invitations/{id}/resend:
+    post:
+      tags: [Invitations]
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses:
+        "200": { description: Invitation resent }
+  /invitations/{id}/revoke:
+    post:
+      tags: [Invitations]
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses:
+        "200": { description: Invitation revoked }
+  /sessions:
+    get:
+      tags: [Sessions]
+      responses:
+        "200": { description: Active sessions }
+    delete:
+      tags: [Sessions]
+      responses:
+        "200": { description: Matching sessions revoked }
+  /sessions/{sessionId}:
+    delete:
+      tags: [Sessions]
+      parameters: [ { $ref: "#/components/parameters/sessionId" } ]
+      responses:
+        "204": { description: Session revoked }
+  /skills:
+    get: { tags: [Catalog], responses: { "200": { description: Skills } } }
+    post: { tags: [Catalog], responses: { "201": { description: Skill created } } }
+  /students/{studentId}/skills:
+    post:
+      tags: [Catalog]
+      parameters: [ { $ref: "#/components/parameters/studentId" } ]
+      responses:
+        "200": { description: Student skill upserted }
+  /categories:
+    get: { tags: [Catalog], responses: { "200": { description: Categories } } }
+    post: { tags: [Catalog], responses: { "201": { description: Category created } } }
+  /students:
+    get: { tags: [Students], responses: { "200": { description: Paged students } } }
+  /students/me:
+    get: { tags: [Students], responses: { "200": { description: Current student profile } } }
+  /students/{id}:
+    get: { tags: [Students], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Student profile } } }
+    put: { tags: [Students], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Student updated } } }
+  /students/{id}/activate:
+    post: { tags: [Students], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Student activated } } }
+  /students/{id}/deactivate:
+    post: { tags: [Students], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Student deactivated } } }
+  /tasks:
+    get: { tags: [Tasks], responses: { "200": { description: Paged tasks } } }
+    post: { tags: [Tasks], responses: { "201": { description: Task created } } }
+  /tasks/my:
+    get: { tags: [Tasks], responses: { "200": { description: Current user task page } } }
+  /tasks/{id}:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task detail } } }
+    put: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task updated } } }
+  /tasks/{id}/assign:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task assigned } } }
+  /tasks/{id}/reassign:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task reassigned } } }
+  /tasks/{id}/unassign:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task unassigned } } }
+  /tasks/{id}/accept:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task accepted } } }
+  /tasks/{id}/start:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task started } } }
+  /tasks/{id}/submit:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task submitted } } }
+  /tasks/{id}/cancel:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task cancelled } } }
+  /tasks/{id}/history:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Assignment history } } }
+  /tasks/{id}/dependencies:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task dependencies } } }
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "201": { description: Dependency added } } }
+  /tasks/{id}/skills:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Required skills } } }
+  /tasks/{id}/comments:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Task comments } } }
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "201": { description: Comment added } } }
+  /tasks/{id}/comments/{commentId}:
+    put: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" }, { $ref: "#/components/parameters/commentId" } ], responses: { "200": { description: Comment updated } } }
+    delete: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" }, { $ref: "#/components/parameters/commentId" } ], responses: { "204": { description: Comment deleted } } }
+  /tasks/{id}/checklist:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Checklist } } }
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "201": { description: Checklist item added } } }
+  /tasks/{id}/checklist/{itemId}/complete:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" }, { $ref: "#/components/parameters/itemId" } ], responses: { "200": { description: Checklist item completed } } }
+  /tasks/{id}/checklist/{itemId}/uncomplete:
+    post: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" }, { $ref: "#/components/parameters/itemId" } ], responses: { "200": { description: Checklist item reopened } } }
+  /tasks/{id}/recommendations:
+    get: { tags: [Tasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Assignment recommendations } } }
+  /requests:
+    get: { tags: [Requests], responses: { "200": { description: Paged task requests } } }
+  /requests/extension:
+    post: { tags: [Requests], responses: { "201": { description: Extension request created } } }
+  /requests/reassignment:
+    post: { tags: [Requests], responses: { "201": { description: Reassignment request created } } }
+  /requests/{id}/approve:
+    post: { tags: [Requests], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Request approved } } }
+  /requests/{id}/reject:
+    post: { tags: [Requests], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Request rejected } } }
+  /requests/{id}/cancel:
+    post: { tags: [Requests], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Request cancelled } } }
+  /tasks/{taskId}/submissions:
+    get: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/taskId" } ], responses: { "200": { description: Task submissions } } }
+  /tasks/{taskId}/submissions/uploads:
+    post: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/taskId" } ], responses: { "201": { description: Submission upload intent } } }
+  /submissions/{id}/versions:
+    get: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Submission versions } } }
+  /submissions/versions/{versionId}/complete:
+    post: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/versionId" } ], responses: { "200": { description: Upload completed } } }
+  /submissions/{id}/approve:
+    post: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Submission approved } } }
+  /submissions/{id}/revision-request:
+    post: { tags: [Submissions], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Revision requested } } }
+  /marketplace/listings:
+    get: { tags: [Marketplace], responses: { "200": { description: Marketplace listings } } }
+  /marketplace/tasks/{taskId}/publish:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/taskId" } ], responses: { "201": { description: Listing published } } }
+  /marketplace/listings/{id}/unpublish:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Listing unpublished } } }
+  /marketplace/listings/{id}/claims:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "201": { description: Claim created } } }
+  /marketplace/claims/{id}/approve:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Claim approved } } }
+  /marketplace/claims/{id}/reject:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Claim rejected } } }
+  /marketplace/claims/{id}/cancel:
+    post: { tags: [Marketplace], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Claim cancelled } } }
+  /semesters:
+    get: { tags: [Schedule], responses: { "200": { description: Semesters } } }
+    post: { tags: [Schedule], responses: { "201": { description: Semester created } } }
+  /semesters/active:
+    get: { tags: [Schedule], responses: { "200": { description: Active semester } } }
+  /semesters/{id}:
+    get: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Semester detail } } }
+    put: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Semester updated } } }
+    delete: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Semester deleted } } }
+  /semesters/{id}/activate:
+    post: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Semester activated } } }
+  /semesters/{id}/archive:
+    post: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Semester archived } } }
+  /schedules/students/{studentId}:
+    get: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/studentId" } ], responses: { "200": { description: Student schedule } } }
+  /schedules/students/{studentId}/current:
+    get: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/studentId" } ], responses: { "200": { description: Current semester schedule } } }
+  /schedules:
+    post: { tags: [Schedule], responses: { "201": { description: Schedule entry created } } }
+  /schedules/{id}:
+    put: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Schedule entry updated } } }
+    delete: { tags: [Schedule], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Schedule entry deleted } } }
+  /availability/students/{studentId}:
+    get: { tags: [Availability], parameters: [ { $ref: "#/components/parameters/studentId" } ], responses: { "200": { description: Student availability } } }
+  /availability/students/{studentId}/current:
+    get: { tags: [Availability], parameters: [ { $ref: "#/components/parameters/studentId" } ], responses: { "200": { description: Current semester availability } } }
+  /availability:
+    post: { tags: [Availability], responses: { "201": { description: Availability created } } }
+  /availability/{id}:
+    put: { tags: [Availability], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Availability updated } } }
+    delete: { tags: [Availability], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Availability deleted } } }
+  /files:
+    get: { tags: [Files], responses: { "200": { description: Paged files } } }
+  /files/uploads:
+    post: { tags: [Files], responses: { "201": { description: Department file upload intent } } }
+  /files/{id}/complete:
+    post: { tags: [Files], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: File upload completed } } }
+  /files/{id}/download:
+    get: { tags: [Files], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Authorized download contract } } }
+  /files/{id}:
+    delete: { tags: [Files], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: File deleted } } }
+  /files/folders:
+    get: { tags: [Files], responses: { "200": { description: Folders } } }
+    post: { tags: [Files], responses: { "201": { description: Folder created } } }
+  /files/folders/{id}:
+    put: { tags: [Files], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Folder renamed } } }
+    delete: { tags: [Files], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Folder deleted } } }
+  /announcements:
+    get: { tags: [Announcements], responses: { "200": { description: Paged announcements } } }
+    post: { tags: [Announcements], responses: { "201": { description: Announcement created } } }
+  /announcements/{id}:
+    get: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement detail } } }
+    put: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement updated } } }
+    delete: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Announcement deleted } } }
+  /announcements/{id}/publish:
+    post: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement published } } }
+  /announcements/{id}/unpublish:
+    post: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement unpublished } } }
+  /announcements/{id}/pin:
+    post: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement pinned } } }
+  /announcements/{id}/unpin:
+    post: { tags: [Announcements], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Announcement unpinned } } }
+  /notifications:
+    get: { tags: [Notifications], responses: { "200": { description: Paged notifications } } }
+  /notifications/unread-count:
+    get: { tags: [Notifications], responses: { "200": { description: Unread count } } }
+  /notifications/{id}/read:
+    post: { tags: [Notifications], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Notification marked read } } }
+  /notifications/read-all:
+    post: { tags: [Notifications], responses: { "200": { description: All notifications marked read } } }
+  /notifications/preferences:
+    put: { tags: [Notifications], responses: { "200": { description: Preference updated } } }
+  /templates:
+    get: { tags: [Templates], responses: { "200": { description: Task templates } } }
+    post: { tags: [Templates], responses: { "201": { description: Template created } } }
+  /templates/{id}:
+    get: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Template detail } } }
+    put: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Template updated } } }
+    delete: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Template deleted } } }
+  /recurring-tasks:
+    get: { tags: [RecurringTasks], responses: { "200": { description: Recurring tasks } } }
+    post: { tags: [RecurringTasks], responses: { "201": { description: Recurring task created } } }
+  /recurring-tasks/{id}:
+    get: { tags: [RecurringTasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Recurring task detail } } }
+    put: { tags: [RecurringTasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Recurring task updated } } }
+    delete: { tags: [RecurringTasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Recurring task deleted } } }
+  /recurring-tasks/{id}/activate:
+    post: { tags: [RecurringTasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Recurring task activated } } }
+  /recurring-tasks/{id}/deactivate:
+    post: { tags: [RecurringTasks], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Recurring task deactivated } } }
+  /analytics/dashboard:
+    get: { tags: [Analytics], responses: { "200": { description: Dashboard analytics } } }
+  /analytics/tasks/status:
+    get: { tags: [Analytics], responses: { "200": { description: Tasks by status } } }
+  /analytics/tasks/category:
+    get: { tags: [Analytics], responses: { "200": { description: Tasks by category } } }
+  /analytics/workload:
+    get: { tags: [Analytics], responses: { "200": { description: Workload distribution } } }
+  /analytics/requests:
+    get: { tags: [Analytics], responses: { "200": { description: Request analytics } } }
+  /settings:
+    get: { tags: [Settings], responses: { "200": { description: Settings } } }
+  /settings/{key}:
+    put:
+      tags: [Settings]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Setting updated }
+  /audit:
+    get: { tags: [Audit], responses: { "200": { description: Audit log page } } }
+  /audit/{id}:
+    get: { tags: [Audit], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Audit log detail } } }
+  /exports:
+    post:
+      tags: [Exports]
+      responses:
+        "202": { description: Export contract accepted }
+    get:
+      tags: [Exports]
+      responses:
+        "200": { description: Visible export request page }
+  /exports/{id}:
+    get: { tags: [Exports], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Export status detail }, "404": { $ref: "#/components/responses/Problem" } } }
+  /exports/{id}/download:
+    get: { tags: [Exports], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Authorized expiring download contract }, "409": { $ref: "#/components/responses/Problem" } } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    taskId:
+      name: taskId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    studentId:
+      name: studentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    sessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    commentId:
+      name: commentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    itemId:
+      name: itemId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    versionId:
+      name: versionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    TooManyRequests:
+      description: Authentication rate limit exceeded.
+    Problem:
+      description: RFC 7807 problem details.

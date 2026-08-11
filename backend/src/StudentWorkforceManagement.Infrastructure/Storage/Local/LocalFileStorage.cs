@@ -1,27 +1,36 @@
+using System.Globalization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using StudentWorkforceManagement.Application.Common.Storage;
 
 namespace StudentWorkforceManagement.Infrastructure.Storage.Local;
 
-public sealed class LocalFileStorage(IOptions<StorageOptions> options) : IFileStorage
+public sealed class LocalFileStorage(IOptions<StorageOptions> options, IDataProtectionProvider dataProtectionProvider) : IFileStorage
 {
     private readonly StorageOptions _options = options.Value;
+    private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("StudentWorkforceManagement.LocalFileStorage.SignedUrls.v1");
 
     public Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default)
     {
         var storageKey = StorageKeyFactory.Create(request);
         EnsureSafeStorageKey(storageKey);
         var uploadId = Guid.NewGuid();
-        var uri = new Uri($"/api/v1/storage/local/uploads/{uploadId:N}", UriKind.Relative);
-        return Task.FromResult(new SignedUploadTarget(uploadId, storageKey, uri, DateTimeOffset.UtcNow.AddMinutes(_options.SignedUrlLifetimeMinutes), request.RequiresMultipartUpload));
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.SignedUrlLifetimeMinutes);
+        var token = CreateToken("PUT", storageKey, expiresAt);
+        var uri = new Uri($"/api/v1/storage/local/uploads/{uploadId:N}?token={Uri.EscapeDataString(token)}", UriKind.Relative);
+        return Task.FromResult(new SignedUploadTarget(uploadId, storageKey, uri, expiresAt, request.RequiresMultipartUpload, "PUT", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Content-Type"] = request.MimeType
+        }));
     }
 
     public Task<SignedDownloadTarget> CreateDownloadTargetAsync(string storageKey, CancellationToken cancellationToken = default)
     {
         EnsureSafeStorageKey(storageKey);
-        var encoded = Uri.EscapeDataString(storageKey);
-        var uri = new Uri($"/api/v1/storage/local/downloads/{encoded}", UriKind.Relative);
-        return Task.FromResult(new SignedDownloadTarget(uri, DateTimeOffset.UtcNow.AddMinutes(_options.SignedUrlLifetimeMinutes)));
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.SignedUrlLifetimeMinutes);
+        var token = CreateToken("GET", storageKey, expiresAt);
+        var uri = new Uri($"/api/v1/storage/local/downloads?token={Uri.EscapeDataString(token)}", UriKind.Relative);
+        return Task.FromResult(new SignedDownloadTarget(uri, expiresAt));
     }
 
     public Task<StoredFileMetadata?> GetMetadataAsync(string storageKey, CancellationToken cancellationToken = default)
@@ -84,6 +93,45 @@ public sealed class LocalFileStorage(IOptions<StorageOptions> options) : IFileSt
             throw new InvalidOperationException("Storage key resolves outside the configured local storage root.");
         }
         return path;
+    }
+
+    public bool TryValidateToken(string token, string method, out string storageKey)
+    {
+        storageKey = string.Empty;
+        try
+        {
+            var payload = _protector.Unprotect(token);
+            var parts = payload.Split('|');
+            if (parts.Length != 3 || !string.Equals(parts[0], method, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!long.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var unixTime))
+            {
+                return false;
+            }
+
+            var expiresAt = DateTimeOffset.FromUnixTimeSeconds(unixTime);
+            if (expiresAt <= DateTimeOffset.UtcNow)
+            {
+                return false;
+            }
+
+            EnsureSafeStorageKey(parts[1]);
+            storageKey = parts[1];
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string CreateToken(string method, string storageKey, DateTimeOffset expiresAt)
+    {
+        EnsureSafeStorageKey(storageKey);
+        return _protector.Protect(string.Join('|', method.ToUpperInvariant(), storageKey, expiresAt.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)));
     }
 
     private static void EnsureSafeStorageKey(string storageKey)

@@ -26,6 +26,7 @@ using StudentWorkforceManagement.Infrastructure.Security.Tokens;
 using Category = StudentWorkforceManagement.Domain.Entities.Category;
 using Role = StudentWorkforceManagement.Domain.Entities.Role;
 using Session = StudentWorkforceManagement.Domain.Entities.Session;
+using Skill = StudentWorkforceManagement.Domain.Entities.Skill;
 using Student = StudentWorkforceManagement.Domain.Entities.Student;
 using SubmissionVersion = StudentWorkforceManagement.Domain.Entities.SubmissionVersion;
 using TaskSubmission = StudentWorkforceManagement.Domain.Entities.TaskSubmission;
@@ -339,7 +340,7 @@ public sealed class LiveApiClosureTests
 
         using var openApi = JsonDocument.Parse(await anonymous.GetStringAsync("/openapi/v1.json"));
         var operations = EnumerateApplicationOperations(openApi.RootElement);
-        Assert.Equal(139, operations.Count);
+        Assert.Equal(152, operations.Count);
 
         var results = new Dictionary<string, HttpStatusCode>(StringComparer.OrdinalIgnoreCase);
         foreach (var operation in operations)
@@ -353,7 +354,7 @@ public sealed class LiveApiClosureTests
         }
 
         Assert.Equal(operations.Count, results.Count);
-        Assert.Equal(139, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
+        Assert.Equal(152, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
@@ -445,6 +446,7 @@ public sealed class LiveApiClosureTests
             .Replace("{id}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
             .Replace("{taskId}", SeededTaskId.ToString("D"), StringComparison.Ordinal)
             .Replace("{studentId}", SeededStudentId.ToString("D"), StringComparison.Ordinal)
+            .Replace("{skillId}", SeededSkillId.ToString("D"), StringComparison.Ordinal)
             .Replace("{sessionId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
             .Replace("{commentId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
             .Replace("{itemId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
@@ -454,6 +456,7 @@ public sealed class LiveApiClosureTests
 
     private Guid SeededTaskId => _currentExecutionSeed?.OtherStudentTaskId ?? Guid.NewGuid();
     private Guid SeededStudentId => _currentExecutionSeed?.StudentId ?? Guid.NewGuid();
+    private Guid SeededSkillId => _currentExecutionSeed?.SkillId ?? Guid.NewGuid();
     private TestSeed? _currentExecutionSeed;
 
     private object? BodyForOperation(string operation)
@@ -476,14 +479,19 @@ public sealed class LiveApiClosureTests
         if (operation.Contains("/reassign", StringComparison.Ordinal)) return new { newStudentId = SeededStudentId, reason = "Swagger audit reassignment" };
         if (operation.Contains("/unassign", StringComparison.Ordinal) || operation.Contains("/cancel", StringComparison.Ordinal)) return new { reason = "Swagger audit reason" };
         if (operation.Contains("/dependencies", StringComparison.Ordinal)) return new { dependsOnTaskId = Guid.NewGuid() };
+        if (operation == "POST /api/v1/tasks/{id}/skills") return new { skillId = SeededSkillId, minimumLevel = "INTERMEDIATE" };
+        if (operation == "PUT /api/v1/tasks/{id}/skills/{skillId}") return new { minimumLevel = "ADVANCED" };
         if (operation.Contains("/comments", StringComparison.Ordinal) && operation.StartsWith("POST ", StringComparison.Ordinal)) return new { content = "Swagger audit comment", visibility = "STUDENT_VISIBLE" };
         if (operation.Contains("/comments", StringComparison.Ordinal) && operation.StartsWith("PUT ", StringComparison.Ordinal)) return new { content = "Swagger audit updated comment" };
         if (operation.Contains("/checklist", StringComparison.Ordinal) && operation.StartsWith("POST ", StringComparison.Ordinal)) return new { title = "Swagger audit checklist", order = 1 };
+        if (operation == "PUT /api/v1/tasks/{id}/checklist/{itemId}") return new { title = "Swagger audit checklist updated" };
+        if (operation == "PUT /api/v1/tasks/{id}/checklist/reorder") return new { items = Array.Empty<object>() };
         if (operation == "POST /api/v1/requests/extension") return new { taskId = SeededTaskId, requestedDeadline = now.AddDays(10), reason = "Swagger audit extension" };
         if (operation == "POST /api/v1/requests/reassignment") return new { taskId = SeededTaskId, reason = "Swagger audit reassignment", suggestedStudentId = SeededStudentId };
         if (operation.Contains("/requests/{id}/approve", StringComparison.Ordinal)) return new { reviewerComment = "Approved", newAssigneeId = SeededStudentId };
         if (operation.Contains("/requests/{id}/reject", StringComparison.Ordinal)) return new { reviewerComment = "Rejected" };
         if (operation == "POST /api/v1/tasks/{taskId}/submissions/uploads") return new { fileName = "submission.txt", fileSize = 10L, mimeType = "text/plain", fileExtension = ".txt", contentHash = "abc123" };
+        if (operation == "POST /api/v1/tasks/{taskId}/uploads/initiate") return new { fileName = "submission.txt", fileSize = 10L, mimeType = "text/plain", fileExtension = ".txt", contentHash = "abc123" };
         if (operation.Contains("/submissions/{id}/", StringComparison.Ordinal)) return new { reviewerComment = "Reviewed" };
         if (operation.Contains("/marketplace/tasks", StringComparison.Ordinal)) return new { approvalMode = "MANUAL_APPROVAL", expiresAt = now.AddDays(5) };
         if (operation.Contains("/marketplace/listings/{id}/claims", StringComparison.Ordinal)) return new { expiresAt = now.AddDays(2) };
@@ -675,7 +683,9 @@ public sealed class LiveApiClosureTests
             dbContext.Students.AddRange(student, otherStudent);
 
             var category = new Category { Id = Guid.NewGuid(), Name = "General" };
+            var skill = new Skill { Id = Guid.NewGuid(), Name = "Data QA", Description = "Seeded audit skill" };
             dbContext.Categories.Add(category);
+            dbContext.Skills.Add(skill);
 
             var ownTask = new TaskEntity
             {
@@ -749,7 +759,7 @@ public sealed class LiveApiClosureTests
             dbContext.Sessions.AddRange(adminSession, managerSession, reviewerSession, studentSession, otherStudentSession, inactiveSession, revokedSession);
 
             await dbContext.SaveChangesAsync();
-            Seed = new TestSeed(admin.Id, adminSession.Id, manager.Id, managerSession.Id, reviewer.Id, reviewerSession.Id, studentUser.Id, studentSession.Id, otherStudentUser.Id, otherStudentSession.Id, inactive.Id, inactiveSession.Id, revokedSession.Id, student.Id, otherStudent.Id, otherTask.Id, submission.Id, category.Id);
+            Seed = new TestSeed(admin.Id, adminSession.Id, manager.Id, managerSession.Id, reviewer.Id, reviewerSession.Id, studentUser.Id, studentSession.Id, otherStudentUser.Id, otherStudentSession.Id, inactive.Id, inactiveSession.Id, revokedSession.Id, student.Id, otherStudent.Id, otherTask.Id, submission.Id, category.Id, skill.Id);
         }
 
         private static User NewUser(string email, Role role, bool isActive = true)
@@ -791,7 +801,8 @@ public sealed class LiveApiClosureTests
         Guid OtherStudentId,
         Guid OtherStudentTaskId,
         Guid ReviewableSubmissionId,
-        Guid CategoryId);
+        Guid CategoryId,
+        Guid SkillId);
 
     private sealed class FakeExportJobScheduler : IExportJobScheduler
     {
@@ -811,7 +822,8 @@ public sealed class LiveApiClosureTests
 
         public Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException("Direct upload targets are not used by these HTTP endpoint adapters.");
+            var storageKey = $"{request.OwnershipScope}/{Guid.NewGuid():N}{request.FileExtension}";
+            return Task.FromResult(new SignedUploadTarget(Guid.NewGuid(), storageKey, new Uri($"/api/v1/storage/local/uploads/{Guid.NewGuid():N}", UriKind.Relative), DateTimeOffset.UtcNow.AddMinutes(5), false, "PUT", new Dictionary<string, string> { ["Content-Type"] = request.MimeType }));
         }
 
         public Task<SignedDownloadTarget> CreateDownloadTargetAsync(string storageKey, CancellationToken cancellationToken = default)

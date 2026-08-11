@@ -209,7 +209,7 @@ public sealed class MarketplaceCommandHandler(IApplicationDbContext dbContext, I
 
     private static MarketplaceListingDto ToDto(MarketplaceListing listing)
     {
-        return new MarketplaceListingDto(listing.Id, listing.TaskId, listing.Status, listing.ApprovalMode, listing.PublishedAt, listing.ExpiresAt, listing.ConcurrencyToken);
+        return new MarketplaceListingDto(listing.Id, listing.TaskId, listing.Status, listing.ApprovalMode, listing.PublishedAt, listing.ExpiresAt, listing.ConcurrencyToken, null);
     }
 
     private static MarketplaceClaimDto ToDto(MarketplaceClaim claim)

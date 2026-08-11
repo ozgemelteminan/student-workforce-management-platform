@@ -27,7 +27,7 @@ public sealed record InitiateSubmissionUploadCommand(
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.Students;
 }
 
-public sealed record CompleteSubmissionUploadCommand(Guid SubmissionVersionId) : IRequest<SubmissionVersionDto>, IAuthorizableRequest, ITransactionalRequest
+public sealed record CompleteSubmissionUploadCommand(Guid SubmissionVersionId, Guid? TaskId = null) : IRequest<SubmissionVersionDto>, IAuthorizableRequest, ITransactionalRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.Students;
 }
@@ -89,7 +89,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             .Select(version => (int?)version.VersionNumber)
             .MaxAsync(cancellationToken) ?? 0;
 
-        var storageKey = $"task-submissions/{request.TaskId:N}/{Guid.NewGuid():N}{upload.FileExtension}";
+        var target = await storage.CreateUploadTargetAsync(new UploadTargetRequest(upload.FileName, upload.FileSizeBytes, upload.MimeType, upload.FileExtension, "task-submissions", false), cancellationToken);
         var version = new SubmissionVersion
         {
             Id = Guid.NewGuid(),
@@ -98,7 +98,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             File = new FileMetadata
             {
                 FileName = upload.FileName,
-                StorageKey = storageKey,
+                StorageKey = target.StorageKey,
                 FileSize = upload.FileSizeBytes,
                 MimeType = upload.MimeType,
                 FileExtension = upload.FileExtension,
@@ -109,7 +109,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
             UploadedAt = clock.UtcNow
         };
         dbContext.SubmissionVersions.Add(version);
-        return new SubmissionUploadIntentDto(version.Id, submission.Id, version.VersionNumber, storageKey, version.File.FileName, version.File.FileSize, version.File.MimeType, version.File.FileExtension, version.FileStatus);
+        return new SubmissionUploadIntentDto(version.Id, submission.Id, version.VersionNumber, target.StorageKey, version.File.FileName, version.File.FileSize, version.File.MimeType, version.File.FileExtension, version.FileStatus, target.UploadUrl, target.UploadMethod, target.RequiredHeaders ?? new Dictionary<string, string>(), target.ExpiresAt);
     }
 
     public async System.Threading.Tasks.Task<SubmissionVersionDto> Handle(CompleteSubmissionUploadCommand request, CancellationToken cancellationToken)
@@ -120,6 +120,10 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
         if (version.TaskSubmission?.SubmittedById != studentId)
         {
             throw new ForbiddenException("Students may complete only their own uploads.");
+        }
+        if (request.TaskId.HasValue && version.TaskSubmission.TaskId != request.TaskId.Value)
+        {
+            throw new NotFoundException("SubmissionVersion", request.SubmissionVersionId);
         }
         if (version.FileStatus == FileStatus.CONFIRMED)
         {

@@ -15,6 +15,7 @@ using StudentWorkforceManagement.Application.Files.Commands;
 using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Application.Students.Queries;
 using StudentWorkforceManagement.Application.Submissions.Commands.CompleteSubmissionUpload;
+using StudentWorkforceManagement.Application.Submissions.Queries.GetSubmission;
 using StudentWorkforceManagement.Application.Tasks.Services;
 using StudentWorkforceManagement.Domain.Entities;
 using StudentWorkforceManagement.Domain.Enums;
@@ -246,6 +247,9 @@ public sealed class ApplicationCompletionTests
 
         Assert.StartsWith("task-submissions/", initiated.StorageKey);
         Assert.DoesNotContain("deliverable", initiated.StorageKey, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(initiated.SignedUploadUrl);
+        Assert.Equal("PUT", initiated.UploadMethod);
+        Assert.True(initiated.ExpiresAt > DateTimeOffset.UtcNow);
 
         var completed = await handler.Handle(new CompleteSubmissionUploadCommand(initiated.SubmissionVersionId), CancellationToken.None);
         var completedAgain = await handler.Handle(new CompleteSubmissionUploadCommand(initiated.SubmissionVersionId), CancellationToken.None);
@@ -253,6 +257,43 @@ public sealed class ApplicationCompletionTests
         Assert.Equal(FileStatus.CONFIRMED, completed.FileStatus);
         Assert.Equal(completed.Id, completedAgain.Id);
         Assert.Single(context.SubmissionVersions);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Submission_download_url_requires_ownership_and_confirmed_file()
+    {
+        await using var context = CreateContext();
+        var owner = SeedStudent(context, "download-owner@example.com");
+        var other = SeedStudent(context, "download-other@example.com");
+        var category = new Category { Id = Guid.NewGuid(), Name = "Downloads" };
+        var task = new StudentWorkforceManagement.Domain.Entities.Task { Id = Guid.NewGuid(), Title = "Download", CategoryId = category.Id, CreatedById = Guid.NewGuid(), AssignedStudentId = owner.Id, Priority = TaskPriority.MEDIUM, Difficulty = TaskDifficulty.EASY, Status = TaskStatus.SUBMITTED_FOR_REVIEW, Deadline = DateTimeOffset.UtcNow.AddDays(2), EstimatedDurationMinutes = 60 };
+        var submission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = owner.Id, Status = SubmissionStatus.SUBMITTED_FOR_REVIEW };
+        var version = new SubmissionVersion
+        {
+            Id = Guid.NewGuid(),
+            TaskSubmissionId = submission.Id,
+            TaskSubmission = submission,
+            VersionNumber = 1,
+            UploadedById = owner.Id,
+            UploadedAt = DateTimeOffset.UtcNow,
+            FileStatus = FileStatus.CONFIRMED,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "deliverable.pdf", StorageKey = "task-submissions/file.pdf", FileSize = 12, MimeType = "application/pdf", FileExtension = ".pdf" }
+        };
+        context.Categories.Add(category);
+        context.Tasks.Add(task);
+        context.TaskSubmissions.Add(submission);
+        context.SubmissionVersions.Add(version);
+        await context.SaveChangesAsync();
+        var ownerHandler = new GetSubmissionQueryHandler(context, new FakeCurrentUser(Guid.NewGuid(), owner.Id, UserRole.STUDENT), new FakeFileStorage());
+        var otherHandler = new GetSubmissionQueryHandler(context, new FakeCurrentUser(Guid.NewGuid(), other.Id, UserRole.STUDENT), new FakeFileStorage());
+
+        var download = await ownerHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(version.Id, submission.Id), CancellationToken.None);
+
+        Assert.Equal(version.Id, download.SubmissionVersionId);
+        Assert.True(download.ExpiresAt > DateTimeOffset.UtcNow);
+        Assert.DoesNotContain("SecretKey", download.SignedDownloadUrl.ToString(), StringComparison.OrdinalIgnoreCase);
+        await Assert.ThrowsAsync<ForbiddenException>(() => otherHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(version.Id, submission.Id), CancellationToken.None));
+        await Assert.ThrowsAsync<NotFoundException>(() => ownerHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(version.Id, Guid.NewGuid()), CancellationToken.None));
     }
 
     private static IUploadFilePolicy CreateUploadPolicy()
@@ -339,7 +380,11 @@ public sealed class ApplicationCompletionTests
     private sealed class FakeFileStorage : IFileStorage
     {
         public Dictionary<string, StoredFileMetadata> Metadata { get; } = new(StringComparer.Ordinal);
-        public System.Threading.Tasks.Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public System.Threading.Tasks.Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default)
+        {
+            var storageKey = $"{request.OwnershipScope}/{Guid.NewGuid():N}{request.FileExtension}";
+            return System.Threading.Tasks.Task.FromResult(new SignedUploadTarget(Guid.NewGuid(), storageKey, new Uri($"https://storage.example/uploads/{storageKey}", UriKind.Absolute), DateTimeOffset.UtcNow.AddMinutes(5), false, "PUT", new Dictionary<string, string> { ["Content-Type"] = request.MimeType }));
+        }
         public System.Threading.Tasks.Task<SignedDownloadTarget> CreateDownloadTargetAsync(string storageKey, CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.FromResult(new SignedDownloadTarget(new Uri("https://storage.example/download"), DateTimeOffset.UtcNow.AddMinutes(5)));
         public System.Threading.Tasks.Task<StoredFileMetadata?> GetMetadataAsync(string storageKey, CancellationToken cancellationToken = default)
         {

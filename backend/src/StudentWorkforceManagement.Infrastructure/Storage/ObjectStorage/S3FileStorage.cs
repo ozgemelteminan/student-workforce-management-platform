@@ -39,7 +39,10 @@ public sealed class S3FileStorage : IFileStorage
             Expires = expiresAt.UtcDateTime,
             ContentType = request.MimeType
         });
-        return Task.FromResult(new SignedUploadTarget(Guid.NewGuid(), storageKey, new Uri(url), expiresAt, request.RequiresMultipartUpload));
+        return Task.FromResult(new SignedUploadTarget(Guid.NewGuid(), storageKey, new Uri(url), expiresAt, request.RequiresMultipartUpload, "PUT", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Content-Type"] = request.MimeType
+        }));
     }
 
     public Task<SignedDownloadTarget> CreateDownloadTargetAsync(string storageKey, CancellationToken cancellationToken = default)

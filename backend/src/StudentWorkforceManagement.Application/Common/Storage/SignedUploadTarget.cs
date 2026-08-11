@@ -5,4 +5,6 @@ public sealed record SignedUploadTarget(
     string StorageKey,
     Uri UploadUrl,
     DateTimeOffset ExpiresAt,
-    bool IsMultipart);
+    bool IsMultipart,
+    string UploadMethod = "PUT",
+    IReadOnlyDictionary<string, string>? RequiredHeaders = null);

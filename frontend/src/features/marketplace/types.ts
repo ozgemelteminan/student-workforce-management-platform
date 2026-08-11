@@ -1,8 +1,26 @@
-import type { PaginatedResult } from '../tasks/types'
+import type { PaginatedResult, SkillLevel, TaskPriority } from '../tasks/types'
 
-export type MarketplaceListingStatus = 'PUBLISHED' | 'UNPUBLISHED' | 'CLOSED'
-export type MarketplaceApprovalMode = 'AUTO_APPROVE' | 'MANUAL_APPROVAL'
+export type MarketplaceListingStatus = 'DRAFT' | 'PUBLISHED' | 'UNPUBLISHED' | 'EXPIRED' | 'CLOSED'
+export type MarketplaceApprovalMode = 'AUTO_APPROVAL' | 'MANUAL_APPROVAL'
 export type MarketplaceClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
+
+export type MarketplaceRequiredSkillSummary = {
+  skillId: string
+  skillName: string
+  minimumLevel: SkillLevel
+}
+
+export type MarketplaceTaskSummary = {
+  taskId: string
+  title: string
+  description?: string
+  categoryId: string
+  categoryName?: string
+  priority: TaskPriority
+  deadline: string
+  estimatedDurationMinutes: number
+  requiredSkills: MarketplaceRequiredSkillSummary[]
+}
 
 export type MarketplaceListing = {
   id: string
@@ -12,6 +30,7 @@ export type MarketplaceListing = {
   publishedAt?: string
   expiresAt?: string
   concurrencyToken: string
+  taskSummary?: MarketplaceTaskSummary
 }
 
 export type MarketplaceClaim = {

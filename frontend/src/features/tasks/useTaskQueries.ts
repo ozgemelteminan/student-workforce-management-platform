@@ -5,11 +5,14 @@ import {
   addChecklistItem,
   addComment,
   addDependency,
+  addRequiredSkill,
   assignTask,
   cancelTask,
   completeSubmissionUpload,
   createTask,
   createTaskFeedback,
+  deleteRequiredSkill,
+  deleteChecklistItem,
   getAssignmentHistory,
   getCategories,
   getChecklist,
@@ -25,15 +28,20 @@ import {
   getTask,
   getTaskFeedback,
   getTasks,
-  initiateSubmissionUpload,
+  getSubmissionVersionDownloadUrl,
+  openSignedDownload,
   reassignTask,
+  reorderChecklist,
   requestSubmissionRevision,
   setChecklistItem,
   transitionTask,
   unassignTask,
+  updateChecklistItem,
+  updateRequiredSkill,
   updateTask,
+  uploadSubmissionFile,
 } from './api/tasksApi'
-import type { TaskFilters, TaskFormPayload, UpdateTaskPayload } from './types'
+import type { SkillLevel, TaskFilters, TaskFormPayload, UpdateTaskPayload } from './types'
 
 export function useTasks(filters: TaskFilters, enabled = true) {
   return useQuery({ queryKey: queryKeys.tasks.list(stableFilters(filters)), queryFn: ({ signal }) => getTasks(filters, signal), enabled })
@@ -67,6 +75,10 @@ export function useSubmissionVersions(taskId: string | undefined, submissionId: 
     queryFn: ({ signal }) => getSubmissionVersions(taskId ?? '', submissionId ?? '', signal),
     enabled: Boolean(taskId && submissionId),
   })
+}
+
+export function useRequiredSkills(taskId: string | undefined) {
+  return useQuery({ queryKey: queryKeys.tasks.skills(taskId ?? 'missing'), queryFn: ({ signal }) => getRequiredSkills(taskId ?? '', signal), enabled: Boolean(taskId) })
 }
 
 export function useTaskLookups() {
@@ -112,11 +124,21 @@ export function useTaskMutations(taskId?: string) {
     reassign: useMutation({ mutationFn: ({ id, newStudentId, reason }: { id: string; newStudentId: string; reason: string }) => reassignTask(id, newStudentId, reason), onSuccess: async (task) => invalidateTask(task.id) }),
     unassign: useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => unassignTask(id, reason), onSuccess: async (task) => invalidateTask(task.id) }),
     addChecklist: useMutation({ mutationFn: ({ id, title, order }: { id: string; title: string; order: number }) => addChecklistItem(id, title, order), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
+    updateChecklist: useMutation({ mutationFn: ({ id, itemId, title }: { id: string; itemId: string; title: string }) => updateChecklistItem(id, itemId, title), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
+    deleteChecklist: useMutation({ mutationFn: ({ id, itemId }: { id: string; itemId: string }) => deleteChecklistItem(id, itemId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
+    reorderChecklist: useMutation({ mutationFn: ({ id, items }: { id: string; items: { checklistItemId: string; order: number }[] }) => reorderChecklist(id, items), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
     toggleChecklist: useMutation({ mutationFn: ({ id, itemId, completed }: { id: string; itemId: string; completed: boolean }) => setChecklistItem(id, itemId, completed), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
     addComment: useMutation({ mutationFn: ({ id, content, visibility }: { id: string; content: string; visibility: 'STUDENT_VISIBLE' | 'INTERNAL' }) => addComment(id, content, visibility), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.comments(variables.id) }) }),
     addDependency: useMutation({ mutationFn: ({ id, dependsOnTaskId }: { id: string; dependsOnTaskId: string }) => addDependency(id, dependsOnTaskId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.dependencies(variables.id) }) }),
-    initiateUpload: useMutation({ mutationFn: ({ id, file }: { id: string; file: File }) => initiateSubmissionUpload(id, file), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.submissions(variables.id) }) }),
+    initiateUpload: useMutation({ mutationFn: ({ id, file, signal, onProgress }: { id: string; file: File; signal?: AbortSignal; onProgress?: (progress: number) => void }) => uploadSubmissionFile(id, file, { signal, onProgress }), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.submissions(variables.id) }) }),
     completeUpload: useMutation({ mutationFn: (versionId: string) => completeSubmissionUpload(versionId), onSuccess: async () => invalidateTask() }),
+    downloadVersion: useMutation({
+      mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => getSubmissionVersionDownloadUrl(submissionId, versionId),
+      onSuccess: (download) => openSignedDownload(download.signedDownloadUrl),
+    }),
+    addRequiredSkill: useMutation({ mutationFn: ({ id, skillId, minimumLevel }: { id: string; skillId: string; minimumLevel: SkillLevel }) => addRequiredSkill(id, skillId, minimumLevel), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.skills(variables.id) }) }),
+    updateRequiredSkill: useMutation({ mutationFn: ({ id, skillId, minimumLevel }: { id: string; skillId: string; minimumLevel: SkillLevel }) => updateRequiredSkill(id, skillId, minimumLevel), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.skills(variables.id) }) }),
+    deleteRequiredSkill: useMutation({ mutationFn: ({ id, skillId }: { id: string; skillId: string }) => deleteRequiredSkill(id, skillId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.skills(variables.id) }) }),
     requestRevision: useMutation({ mutationFn: ({ submissionId, comment }: { submissionId: string; comment: string }) => requestSubmissionRevision(submissionId, comment), onSuccess: async () => invalidateTask() }),
     createFeedback: useMutation({ mutationFn: ({ id, studentId, rating, comment }: { id: string; studentId: string; rating?: number; comment?: string }) => createTaskFeedback(id, studentId, rating, comment), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.feedback(variables.id) }) }),
   }

@@ -56,6 +56,7 @@ using StudentWorkforceManagement.Application.Tasks.Commands.Checklist;
 using StudentWorkforceManagement.Application.Tasks.Commands.Comments;
 using StudentWorkforceManagement.Application.Tasks.Commands.CreateTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.ReassignTask;
+using StudentWorkforceManagement.Application.Tasks.Commands.RequiredSkills;
 using StudentWorkforceManagement.Application.Tasks.Commands.TransitionTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.UnassignTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.UpdateTask;
@@ -67,6 +68,7 @@ using StudentWorkforceManagement.Application.Tasks.Queries.GetTaskSubresources;
 using StudentWorkforceManagement.Application.Templates.Commands;
 using StudentWorkforceManagement.Application.Templates.Queries;
 using StudentWorkforceManagement.Domain.Enums;
+using StudentWorkforceManagement.Infrastructure.Storage.Local;
 using TaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
 namespace StudentWorkforceManagement.Api.Endpoints;
@@ -95,6 +97,7 @@ public static class V1Endpoints
         MapMarketplace(api);
         MapSchedules(api);
         MapFiles(api);
+        MapLocalStorage(api);
         MapAnnouncements(api);
         MapNotifications(api);
         MapFeedback(api);
@@ -207,7 +210,7 @@ public static class V1Endpoints
     {
         var tasks = api.MapGroup("/tasks").RequireAuthorization().WithTags("Tasks");
         tasks.MapGet("/", async ([AsParameters] TaskQueryParams query, ISender sender, CancellationToken cancellationToken) =>
-            Results.Ok(await sender.Send(new GetTasksQuery { Page = query.Page, PageSize = ClampPageSize(query.PageSize), Search = query.Search, SortBy = query.SortBy, SortDirection = query.SortDirection, StudentId = query.StudentId, Status = query.Status, Priority = query.Priority, Difficulty = query.Difficulty, CategoryId = query.CategoryId, DeadlineFrom = query.DeadlineFrom, DeadlineTo = query.DeadlineTo }, cancellationToken)));
+            Results.Ok(await sender.Send(new GetTasksQuery { Page = query.Page, PageSize = ClampPageSize(query.PageSize), Search = query.Search, SortBy = query.SortBy, SortDirection = query.SortDirection, StudentId = query.StudentId, Status = query.Status, Priority = query.Priority, Difficulty = query.Difficulty, CategoryId = query.CategoryId, IsAssigned = query.IsAssigned, DeadlineFrom = query.DeadlineFrom, DeadlineTo = query.DeadlineTo }, cancellationToken)));
         tasks.MapGet("/my", async ([AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new GetMyTasksQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search, SortBy = page.SortBy, SortDirection = page.SortDirection }, cancellationToken)));
         tasks.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskQuery(id), cancellationToken)));
@@ -225,12 +228,18 @@ public static class V1Endpoints
         tasks.MapGet("/{id:guid}/dependencies", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskDependenciesQuery(id), cancellationToken)));
         tasks.MapPost("/{id:guid}/dependencies", async (Guid id, AddDependencyRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{id}/dependencies", await sender.Send(new AddTaskDependencyCommand(id, request.DependsOnTaskId), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         tasks.MapGet("/{id:guid}/skills", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskRequiredSkillsQuery(id), cancellationToken)));
+        tasks.MapPost("/{id:guid}/skills", async (Guid id, RequiredSkillRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{id}/skills", await sender.Send(new AddTaskRequiredSkillCommand(id, request.SkillId, request.MinimumLevel), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPut("/{id:guid}/skills/{skillId:guid}", async (Guid id, Guid skillId, UpdateRequiredSkillRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateTaskRequiredSkillCommand(id, skillId, request.MinimumLevel), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapDelete("/{id:guid}/skills/{skillId:guid}", async (Guid id, Guid skillId, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteTaskRequiredSkillCommand(id, skillId), cancellationToken); return Results.NoContent(); }).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         tasks.MapGet("/{id:guid}/comments", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskCommentsQuery(id), cancellationToken)));
         tasks.MapPost("/{id:guid}/comments", async (Guid id, TaskCommentRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{id}/comments", await sender.Send(new AddTaskCommentCommand(id, request.Content, request.Visibility), cancellationToken)));
         tasks.MapPut("/{id:guid}/comments/{commentId:guid}", async (Guid id, Guid commentId, UpdateCommentRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateTaskCommentCommand(id, commentId, request.Content), cancellationToken)));
         tasks.MapDelete("/{id:guid}/comments/{commentId:guid}", async (Guid id, Guid commentId, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteTaskCommentCommand(id, commentId), cancellationToken); return Results.NoContent(); });
         tasks.MapGet("/{id:guid}/checklist", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskChecklistQuery(id), cancellationToken)));
         tasks.MapPost("/{id:guid}/checklist", async (Guid id, ChecklistItemRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{id}/checklist", await sender.Send(new AddChecklistItemCommand(id, request.Title, request.Order), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPut("/{id:guid}/checklist/{itemId:guid}", async (Guid id, Guid itemId, ChecklistItemUpdateRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateChecklistItemCommand(id, itemId, request.Title), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapDelete("/{id:guid}/checklist/{itemId:guid}", async (Guid id, Guid itemId, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteChecklistItemCommand(id, itemId), cancellationToken); return Results.NoContent(); }).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPut("/{id:guid}/checklist/reorder", async (Guid id, ChecklistReorderRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReorderChecklistCommand(id, request.Items.Select(item => new ReorderChecklistItem(item.ChecklistItemId, item.Order)).ToArray()), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         tasks.MapPost("/{id:guid}/checklist/{itemId:guid}/complete", async (Guid id, Guid itemId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new CompleteChecklistItemCommand(id, itemId), cancellationToken)));
         tasks.MapPost("/{id:guid}/checklist/{itemId:guid}/uncomplete", async (Guid id, Guid itemId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UncompleteChecklistItemCommand(id, itemId), cancellationToken)));
         tasks.MapGet("/{id:guid}/recommendations", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetAssignmentRecommendationsQuery(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
@@ -253,7 +262,19 @@ public static class V1Endpoints
         var submissions = api.MapGroup("/submissions").RequireAuthorization().WithTags("Submissions");
         api.MapGet("/tasks/{taskId:guid}/submissions", async (Guid taskId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskSubmissionsQuery(taskId), cancellationToken))).RequireAuthorization();
         api.MapPost("/tasks/{taskId:guid}/submissions/uploads", async (Guid taskId, SubmissionUploadRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{taskId}/submissions", await sender.Send(new InitiateSubmissionUploadCommand(taskId, request.FileName, request.FileSize, request.MimeType, request.FileExtension, request.ContentHash), cancellationToken))).RequireAuthorization("STUDENT");
+        api.MapPost("/tasks/{taskId:guid}/uploads/initiate", async (Guid taskId, SubmissionUploadRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{taskId}/submissions", await sender.Send(new InitiateSubmissionUploadCommand(taskId, request.FileName, request.FileSize, request.MimeType, request.FileExtension, request.ContentHash), cancellationToken))).RequireAuthorization("STUDENT");
+        api.MapPost("/tasks/{taskId:guid}/uploads/{uploadId:guid}/complete", async (Guid taskId, Guid uploadId, ISender sender, CancellationToken cancellationToken) =>
+        {
+            return Results.Ok(await sender.Send(new CompleteSubmissionUploadCommand(uploadId, taskId), cancellationToken));
+        }).RequireAuthorization("STUDENT");
+        submissions.MapGet("/{id:guid}/download-url", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSubmissionDownloadUrlQuery(id), cancellationToken)));
         submissions.MapGet("/{id:guid}/versions", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSubmissionVersionsQuery(id), cancellationToken)));
+        submissions.MapGet("/{id:guid}/versions/{versionId:guid}/download-url", async (Guid id, Guid versionId, ISender sender, CancellationToken cancellationToken) =>
+        {
+            _ = id;
+            return Results.Ok(await sender.Send(new GetSubmissionVersionDownloadUrlQuery(versionId, id), cancellationToken));
+        });
+        submissions.MapGet("/versions/{versionId:guid}/download-url", async (Guid versionId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSubmissionVersionDownloadUrlQuery(versionId), cancellationToken)));
         submissions.MapPost("/versions/{versionId:guid}/complete", async (Guid versionId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new CompleteSubmissionUploadCommand(versionId), cancellationToken))).RequireAuthorization("STUDENT");
         submissions.MapPost("/{id:guid}/approve", async (Guid id, ReviewSubmissionRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ApproveSubmissionCommand(id, request.ReviewerComment), cancellationToken))).RequireAuthorization("REVIEWERS");
         submissions.MapPost("/{id:guid}/revision-request", async (Guid id, ReviewSubmissionRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new RequestSubmissionRevisionCommand(id, request.ReviewerComment ?? string.Empty), cancellationToken))).RequireAuthorization("REVIEWERS");
@@ -262,7 +283,7 @@ public static class V1Endpoints
     private static void MapMarketplace(RouteGroupBuilder api)
     {
         var marketplace = api.MapGroup("/marketplace").RequireAuthorization().WithTags("Marketplace");
-        marketplace.MapGet("/listings", async ([AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetMarketplaceListingsQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search }, cancellationToken)));
+        marketplace.MapGet("/listings", async ([AsParameters] MarketplaceQueryParams page, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetMarketplaceListingsQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search, Status = page.Status }, cancellationToken)));
         marketplace.MapPost("/tasks/{taskId:guid}/publish", async (Guid taskId, PublishMarketplaceRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/marketplace/listings", await sender.Send(new PublishTaskToMarketplaceCommand(taskId, request.ApprovalMode, request.ExpiresAt), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         marketplace.MapPost("/listings/{id:guid}/unpublish", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UnpublishTaskCommand(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         marketplace.MapPost("/listings/{id:guid}/claims", async (Guid id, ClaimMarketplaceRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/marketplace/listings/{id}/claims", await sender.Send(new ClaimMarketplaceTaskCommand(id, request.ExpiresAt), cancellationToken))).RequireAuthorization("STUDENT");
@@ -310,6 +331,43 @@ public static class V1Endpoints
         files.MapPost("/folders", async (CreateFileFolderCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/files/folders", await sender.Send(request, cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         files.MapPut("/folders/{id:guid}", async (Guid id, RenameFolderRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new RenameFileFolderCommand(id, request.Name), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         files.MapDelete("/folders/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteFileFolderCommand(id), cancellationToken); return Results.NoContent(); }).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+    }
+
+    private static void MapLocalStorage(RouteGroupBuilder api)
+    {
+        var storage = api.MapGroup("/storage/local").WithTags("Storage");
+        storage.MapPut("/uploads/{uploadId:guid}", async (Guid uploadId, string? token, HttpRequest request, LocalFileStorage localStorage, CancellationToken cancellationToken) =>
+        {
+            _ = uploadId;
+            if (string.IsNullOrWhiteSpace(token) || !localStorage.TryValidateToken(token, "PUT", out var storageKey))
+            {
+                return Results.Forbid();
+            }
+            if (request.ContentLength.HasValue && request.ContentLength.Value > 1_073_741_824L)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
+            await localStorage.SaveAsync(storageKey, request.Body, request.ContentType ?? "application/octet-stream", cancellationToken);
+            return Results.NoContent();
+        }).AllowAnonymous();
+
+        storage.MapGet("/downloads", async (string? token, LocalFileStorage localStorage, CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(token) || !localStorage.TryValidateToken(token, "GET", out var storageKey))
+            {
+                return Results.Forbid();
+            }
+
+            var metadata = await localStorage.GetMetadataAsync(storageKey, cancellationToken);
+            if (metadata is null)
+            {
+                return Results.NotFound();
+            }
+
+            var stream = await localStorage.OpenReadAsync(storageKey, cancellationToken);
+            return Results.File(stream, metadata.MimeType, Path.GetFileName(storageKey), enableRangeProcessing: true);
+        }).AllowAnonymous();
     }
 
     private static void MapAnnouncements(RouteGroupBuilder api)
@@ -430,7 +488,8 @@ public static class V1Endpoints
     }
 
     public sealed record PageParams(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null);
-    public sealed record TaskQueryParams(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null, Guid? StudentId = null, TaskStatus? Status = null, TaskPriority? Priority = null, TaskDifficulty? Difficulty = null, Guid? CategoryId = null, DateTimeOffset? DeadlineFrom = null, DateTimeOffset? DeadlineTo = null);
+    public sealed record TaskQueryParams(int Page = 1, int PageSize = 20, string? Search = null, string? SortBy = null, string? SortDirection = null, Guid? StudentId = null, TaskStatus? Status = null, TaskPriority? Priority = null, TaskDifficulty? Difficulty = null, Guid? CategoryId = null, bool? IsAssigned = null, DateTimeOffset? DeadlineFrom = null, DateTimeOffset? DeadlineTo = null);
+    public sealed record MarketplaceQueryParams(int Page = 1, int PageSize = 20, string? Search = null, MarketplaceListingStatus? Status = null);
     public sealed record RequestQueryParams(int Page = 1, int PageSize = 20, string? Search = null, Guid? TaskId = null, RequestType? Type = null, RequestStatus? Status = null);
     public sealed record AuditQueryParams(int Page = 1, int PageSize = 20, string? Search = null, string? Action = null, string? EntityType = null, Guid? UserId = null, DateTimeOffset? From = null, DateTimeOffset? To = null);
     public sealed record LoginRequest(string Email, string Password, string? DeviceName);
@@ -450,9 +509,14 @@ public static class V1Endpoints
     public sealed record ReassignTaskRequest(Guid NewStudentId, string Reason);
     public sealed record ReasonRequest(string Reason);
     public sealed record AddDependencyRequest(Guid DependsOnTaskId);
+    public sealed record RequiredSkillRequest(Guid SkillId, SkillLevel MinimumLevel);
+    public sealed record UpdateRequiredSkillRequest(SkillLevel MinimumLevel);
     public sealed record TaskCommentRequest(string Content, TaskCommentVisibility Visibility);
     public sealed record UpdateCommentRequest(string Content);
     public sealed record ChecklistItemRequest(string Title, int Order);
+    public sealed record ChecklistItemUpdateRequest(string Title);
+    public sealed record ChecklistReorderItemRequest(Guid ChecklistItemId, int Order);
+    public sealed record ChecklistReorderRequest(IReadOnlyCollection<ChecklistReorderItemRequest> Items);
     public sealed record ApproveRequestBody(string? ReviewerComment, Guid? NewAssigneeId);
     public sealed record RejectRequestBody(string ReviewerComment);
     public sealed record SubmissionUploadRequest(string FileName, long FileSize, string MimeType, string FileExtension, string? ContentHash);

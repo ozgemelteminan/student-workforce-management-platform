@@ -10,8 +10,8 @@ import { ConflictMessage } from '../../features/tasks/components'
 import { DISPLAY_TIME_ZONE } from '../../lib/date-time'
 import { ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth/AuthProvider'
-import { useTask, useTaskLookups, useTaskMutations } from '../../features/tasks/useTaskQueries'
-import type { TaskDifficulty, TaskPriority } from '../../features/tasks/types'
+import { useRequiredSkills, useTask, useTaskLookups, useTaskMutations } from '../../features/tasks/useTaskQueries'
+import type { RequiredSkillPayload, SkillLevel, TaskDifficulty, TaskPriority } from '../../features/tasks/types'
 
 const schema = z.object({
   title: z.string().trim().min(1, 'Title is required.').max(200, 'Title must be 200 characters or fewer.'),
@@ -23,6 +23,7 @@ const schema = z.object({
   startDate: z.string().optional(),
   deadline: z.string().min(1, 'Deadline is required.'),
   estimatedDurationMinutes: z.coerce.number().int().positive('Estimate must be greater than 0.'),
+  requiredSkills: z.array(z.object({ skillId: z.string().uuid(), minimumLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']) })).optional(),
 }).refine((value) => !value.startDate || new Date(toUtc(value.deadline)).getTime() > new Date(toUtc(value.startDate)).getTime(), { path: ['deadline'], message: 'Deadline must be after start date.' })
 
 type FormValues = z.infer<typeof schema>
@@ -35,11 +36,12 @@ export function TaskFormPage() {
   const canManage = user?.roles.includes('ADMIN') || user?.roles.includes('TASK_MANAGER')
   const task = useTask(taskId)
   const lookups = useTaskLookups()
+  const requiredSkills = useRequiredSkills(taskId)
   const mutations = useTaskMutations(taskId)
   const [conflict, setConflict] = useState(false)
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { title: '', description: '', categoryId: '', semesterId: '', priority: 'MEDIUM', difficulty: 'EASY', startDate: '', deadline: '', estimatedDurationMinutes: 60 },
+    defaultValues: { title: '', description: '', categoryId: '', semesterId: '', priority: 'MEDIUM', difficulty: 'EASY', startDate: '', deadline: '', estimatedDurationMinutes: 60, requiredSkills: [] },
   })
 
   useEffect(() => {
@@ -54,9 +56,12 @@ export function TaskFormPage() {
         startDate: task.data.startDate ? toLocalInput(task.data.startDate) : '',
         deadline: toLocalInput(task.data.deadline),
         estimatedDurationMinutes: task.data.estimatedDurationMinutes,
+        requiredSkills: (requiredSkills.data ?? []).map((skill) => ({ skillId: skill.skillId, minimumLevel: skill.minimumLevel })),
       })
     }
-  }, [form, task.data])
+  }, [form, requiredSkills.data, task.data])
+
+  const existingRequiredSkills = useMemo<RequiredSkillPayload[]>(() => (requiredSkills.data ?? []).map((skill) => ({ skillId: skill.skillId, minimumLevel: skill.minimumLevel })), [requiredSkills.data])
 
   useEffect(() => {
     const listener = (event: BeforeUnloadEvent) => {
@@ -82,6 +87,7 @@ export function TaskFormPage() {
     }
     try {
       const saved = isEdit && task.data ? await mutations.update.mutateAsync({ id: task.data.id, payload: { ...payload, concurrencyToken: task.data.concurrencyToken } }) : await mutations.create.mutateAsync(payload)
+      await syncRequiredSkills(saved.id, existingRequiredSkills, values.requiredSkills ?? [], mutations)
       form.reset(values)
       navigate(`/tasks/${saved.id}`)
     } catch (error) {
@@ -119,6 +125,11 @@ export function TaskFormPage() {
             <FormField label="Deadline" error={form.formState.errors.deadline?.message} required>{({ id, describedBy, invalid }) => <Input id={id} type="datetime-local" invalid={invalid} aria-describedby={describedBy} {...form.register('deadline')} />}</FormField>
             <FormField label="Estimated duration" error={form.formState.errors.estimatedDurationMinutes?.message} helperText="Minutes. Example: 90 for 1 hr 30 min." required>{({ id, describedBy, invalid }) => <Input id={id} type="number" min={1} invalid={invalid} aria-describedby={describedBy} {...form.register('estimatedDurationMinutes')} />}</FormField>
             <FormField label="Description" className="lg:col-span-2" error={form.formState.errors.description?.message}>{({ id, describedBy, invalid }) => <Textarea id={id} invalid={invalid} aria-describedby={describedBy} {...form.register('description')} />}</FormField>
+            <RequiredSkillsPicker
+              skills={lookups.skills.data ?? []}
+              selected={form.watch('requiredSkills') ?? []}
+              onChange={(requiredSkills) => form.setValue('requiredSkills', requiredSkills, { shouldDirty: true, shouldValidate: true })}
+            />
             <div className="flex justify-end gap-2 lg:col-span-2">
               <Button variant="outline" onClick={() => navigate(isEdit && taskId ? `/tasks/${taskId}` : '/tasks')}>Discard</Button>
               <Button type="submit" isLoading={mutations.create.isPending || mutations.update.isPending} iconBefore={<Save className="h-4 w-4" />}>Save task</Button>
@@ -128,6 +139,46 @@ export function TaskFormPage() {
       </Card>
     </div>
   )
+}
+
+function RequiredSkillsPicker({ skills, selected, onChange }: { skills: { id: string; name: string }[]; selected: RequiredSkillPayload[]; onChange: (value: RequiredSkillPayload[]) => void }) {
+  const [skillId, setSkillId] = useState('')
+  const [minimumLevel, setMinimumLevel] = useState<SkillLevel>('BEGINNER')
+  const selectedIds = new Set(selected.map((item) => item.skillId))
+  const available = skills.filter((skill) => !selectedIds.has(skill.id))
+  return (
+    <div className="space-y-3 lg:col-span-2">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]">
+        <Select value={skillId} onValueChange={setSkillId}>
+          <SelectTrigger aria-label="Required skill"><SelectValue placeholder={available.length ? 'Choose required skill' : 'No more skills'} /></SelectTrigger>
+          <SelectContent>{available.map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={minimumLevel} onValueChange={(value) => setMinimumLevel(value as SkillLevel)}>
+          <SelectTrigger aria-label="Minimum skill level"><SelectValue /></SelectTrigger>
+          <SelectContent>{['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+        </Select>
+        <Button type="button" variant="outline" onClick={() => { if (skillId) { onChange([...selected, { skillId, minimumLevel }]); setSkillId('') } }}>Add skill</Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {selected.map((item) => {
+          const skill = skills.find((candidate) => candidate.id === item.skillId)
+          return <Button key={item.skillId} type="button" variant="outline" size="sm" onClick={() => onChange(selected.filter((candidate) => candidate.skillId !== item.skillId))}>{skill?.name ?? item.skillId.slice(0, 8)} · {item.minimumLevel} · Remove</Button>
+        })}
+      </div>
+    </div>
+  )
+}
+
+async function syncRequiredSkills(taskId: string, existing: RequiredSkillPayload[], next: RequiredSkillPayload[], mutations: ReturnType<typeof useTaskMutations>) {
+  const existingBySkill = new Map(existing.map((item) => [item.skillId, item.minimumLevel]))
+  const nextBySkill = new Map(next.map((item) => [item.skillId, item.minimumLevel]))
+  for (const [skillId, minimumLevel] of nextBySkill) {
+    if (!existingBySkill.has(skillId)) await mutations.addRequiredSkill.mutateAsync({ id: taskId, skillId, minimumLevel })
+    else if (existingBySkill.get(skillId) !== minimumLevel) await mutations.updateRequiredSkill.mutateAsync({ id: taskId, skillId, minimumLevel })
+  }
+  for (const [skillId] of existingBySkill) {
+    if (!nextBySkill.has(skillId)) await mutations.deleteRequiredSkill.mutateAsync({ id: taskId, skillId })
+  }
 }
 
 function toUtc(value: string) {

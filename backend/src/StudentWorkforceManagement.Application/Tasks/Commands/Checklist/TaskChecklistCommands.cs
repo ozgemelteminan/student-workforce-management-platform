@@ -48,6 +48,19 @@ public sealed record AddChecklistItemCommand(Guid TaskId, string Title, int Orde
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
 }
+public sealed record UpdateChecklistItemCommand(Guid TaskId, Guid ItemId, string Title) : IRequest<TaskChecklistItemDto>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
+}
+public sealed record DeleteChecklistItemCommand(Guid TaskId, Guid ItemId) : IRequest<Unit>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
+}
+public sealed record ReorderChecklistItem(Guid ChecklistItemId, int Order);
+public sealed record ReorderChecklistCommand(Guid TaskId, IReadOnlyCollection<ReorderChecklistItem> Items) : IRequest<IReadOnlyCollection<TaskChecklistItemDto>>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
+}
 public sealed record CompleteChecklistItemCommand(Guid TaskId, Guid ItemId) : IRequest<TaskChecklistItemDto>, IAuthorizableRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AnyRole;
@@ -67,17 +80,107 @@ public sealed class AddChecklistItemCommandValidator : AbstractValidator<AddChec
     }
 }
 
+public sealed class UpdateChecklistItemCommandValidator : AbstractValidator<UpdateChecklistItemCommand>
+{
+    public UpdateChecklistItemCommandValidator()
+    {
+        RuleFor(command => command.TaskId).NotEmpty();
+        RuleFor(command => command.ItemId).NotEmpty();
+        RuleFor(command => command.Title).NotEmpty().MaximumLength(300);
+    }
+}
+
+public sealed class DeleteChecklistItemCommandValidator : AbstractValidator<DeleteChecklistItemCommand>
+{
+    public DeleteChecklistItemCommandValidator()
+    {
+        RuleFor(command => command.TaskId).NotEmpty();
+        RuleFor(command => command.ItemId).NotEmpty();
+    }
+}
+
+public sealed class ReorderChecklistCommandValidator : AbstractValidator<ReorderChecklistCommand>
+{
+    public ReorderChecklistCommandValidator()
+    {
+        RuleFor(command => command.TaskId).NotEmpty();
+        RuleFor(command => command.Items).NotEmpty();
+        RuleForEach(command => command.Items).ChildRules(item =>
+        {
+            item.RuleFor(value => value.ChecklistItemId).NotEmpty();
+            item.RuleFor(value => value.Order).GreaterThanOrEqualTo(0);
+        });
+        RuleFor(command => command.Items.Select(item => item.ChecklistItemId).Distinct().Count()).Equal(command => command.Items.Count).WithMessage("Checklist reorder cannot contain duplicate item ids.");
+        RuleFor(command => command.Items.Select(item => item.Order).Distinct().Count()).Equal(command => command.Items.Count).WithMessage("Checklist reorder cannot contain duplicate positions.");
+    }
+}
+
 public sealed class TaskChecklistCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser, IUtcClock clock)
     : IRequestHandler<AddChecklistItemCommand, TaskChecklistItemDto>,
+      IRequestHandler<UpdateChecklistItemCommand, TaskChecklistItemDto>,
+      IRequestHandler<DeleteChecklistItemCommand, Unit>,
+      IRequestHandler<ReorderChecklistCommand, IReadOnlyCollection<TaskChecklistItemDto>>,
       IRequestHandler<CompleteChecklistItemCommand, TaskChecklistItemDto>,
       IRequestHandler<UncompleteChecklistItemCommand, TaskChecklistItemDto>
 {
     public async System.Threading.Tasks.Task<TaskChecklistItemDto> Handle(AddChecklistItemCommand request, CancellationToken cancellationToken)
     {
+        if (!await dbContext.Tasks.AnyAsync(task => task.Id == request.TaskId, cancellationToken))
+        {
+            throw new NotFoundException("Task", request.TaskId);
+        }
+
         var item = new TaskChecklistItem { Id = Guid.NewGuid(), TaskId = request.TaskId, Title = request.Title.Trim(), Order = request.Order };
         dbContext.TaskChecklistItems.Add(item);
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToDto(item);
+    }
+
+    public async System.Threading.Tasks.Task<TaskChecklistItemDto> Handle(UpdateChecklistItemCommand request, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.TaskChecklistItems.SingleOrDefaultAsync(entity => entity.Id == request.ItemId && entity.TaskId == request.TaskId, cancellationToken)
+            ?? throw new NotFoundException("TaskChecklistItem", request.ItemId);
+
+        item.Title = request.Title.Trim();
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToDto(item);
+    }
+
+    public async System.Threading.Tasks.Task<Unit> Handle(DeleteChecklistItemCommand request, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.TaskChecklistItems.SingleOrDefaultAsync(entity => entity.Id == request.ItemId && entity.TaskId == request.TaskId, cancellationToken)
+            ?? throw new NotFoundException("TaskChecklistItem", request.ItemId);
+
+        dbContext.TaskChecklistItems.Remove(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
+    }
+
+    public async System.Threading.Tasks.Task<IReadOnlyCollection<TaskChecklistItemDto>> Handle(ReorderChecklistCommand request, CancellationToken cancellationToken)
+    {
+        var items = await dbContext.TaskChecklistItems
+            .Where(item => item.TaskId == request.TaskId)
+            .ToListAsync(cancellationToken);
+        if (items.Count == 0 && request.Items.Count > 0 && !await dbContext.Tasks.AnyAsync(task => task.Id == request.TaskId, cancellationToken))
+        {
+            throw new NotFoundException("Task", request.TaskId);
+        }
+
+        var existingIds = items.Select(item => item.Id).OrderBy(id => id).ToArray();
+        var requestedIds = request.Items.Select(item => item.ChecklistItemId).OrderBy(id => id).ToArray();
+        if (!existingIds.SequenceEqual(requestedIds))
+        {
+            throw new ConflictException("Checklist reorder must include exactly the current checklist items for this task.");
+        }
+
+        var orderById = request.Items.ToDictionary(item => item.ChecklistItemId, item => item.Order);
+        foreach (var item in items)
+        {
+            item.Order = orderById[item.Id];
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return items.OrderBy(item => item.Order).Select(ToDto).ToArray();
     }
 
     public System.Threading.Tasks.Task<TaskChecklistItemDto> Handle(CompleteChecklistItemCommand request, CancellationToken cancellationToken) => SetCompletionAsync(request.TaskId, request.ItemId, true, cancellationToken);

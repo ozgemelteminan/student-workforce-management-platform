@@ -25,4 +25,15 @@ describe('task filter URL state', () => {
     expect(params.get('sortBy')).toBe('deadline')
     expect(params.get('sortDirection')).toBe('asc')
   })
+
+  it('serializes the unassigned view as a server-side assignment filter', () => {
+    const filters = filtersFromSearchParams(new URLSearchParams('view=unassigned&page=3'))
+    const params = filtersToSearchParams(filters)
+
+    expect(filters.view).toBe('unassigned')
+    expect(filters.isAssigned).toBe(false)
+    expect(params.get('view')).toBe('unassigned')
+    expect(params.get('isAssigned')).toBe('false')
+    expect(params.get('page')).toBe('3')
+  })
 })

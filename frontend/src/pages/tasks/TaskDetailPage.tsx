@@ -1,4 +1,4 @@
-import { MessageSquarePlus, Paperclip, Play, Send, UserPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, MessageSquarePlus, Paperclip, Play, Send, Trash2, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, CardHeader, Checkbox, EmptyState, ErrorState, FormField, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '../../components/ui'
@@ -29,9 +29,13 @@ export function TaskDetailPage() {
   const [commentVisibility, setCommentVisibility] = useState<TaskCommentVisibility>('STUDENT_VISIBLE')
   const [checklistTitle, setChecklistTitle] = useState('')
   const [dependencyId, setDependencyId] = useState('')
+  const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null)
+  const [editingChecklistTitle, setEditingChecklistTitle] = useState('')
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [reason, setReason] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [uploadController, setUploadController] = useState<AbortController | null>(null)
   const [conflict, setConflict] = useState(false)
   const selectedSubmission = collections.submissions.data?.[0]
   const versions = useSubmissionVersions(taskId, selectedSubmission?.id)
@@ -65,8 +69,30 @@ export function TaskDetailPage() {
       setUploadError('Files must be 1 GB or smaller.')
       return
     }
-    await mutations.initiateUpload.mutateAsync({ id: taskData.id, file })
-    appToast.info('Upload intent created. Direct object upload URL is not exposed by the current submission contract.')
+    const controller = new AbortController()
+    setUploadController(controller)
+    setUploadProgress(0)
+    try {
+      await mutations.initiateUpload.mutateAsync({ id: taskData.id, file, signal: controller.signal, onProgress: setUploadProgress })
+      appToast.success('Submission uploaded.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') appToast.info('Upload cancelled.')
+      else throw error
+    } finally {
+      setUploadController(null)
+      setUploadProgress(null)
+    }
+  }
+
+  const moveChecklist = (index: number, direction: -1 | 1) => {
+    const items = collections.checklist.data ?? []
+    const target = index + direction
+    if (target < 0 || target >= items.length) return
+    const reordered = [...items]
+    const [item] = reordered.splice(index, 1)
+    if (!item) return
+    reordered.splice(target, 0, item)
+    void runMutation(() => mutations.reorderChecklist.mutateAsync({ id: taskData.id, items: reordered.map((entry, order) => ({ checklistItemId: entry.id, order })) }))
   }
 
   return (
@@ -94,11 +120,17 @@ export function TaskDetailPage() {
               <Panel title="Checklist" error={collections.checklist.isError} onRetry={() => void collections.checklist.refetch()}>
                 {collections.checklist.data?.length === 0 ? <EmptyState title="No checklist items." description={staff ? 'Add a supported checklist item below.' : 'No checklist has been defined for this task.'} /> : null}
                 <div className="space-y-2">
-                  {collections.checklist.data?.map((item) => (
-                    <label key={item.id} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+                  {collections.checklist.data?.map((item, index) => (
+                    <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
                       <Checkbox checked={item.isCompleted} onCheckedChange={(checked) => void mutations.toggleChecklist.mutate({ id: taskData.id, itemId: item.id, completed: checked === true })} />
-                      <span className={item.isCompleted ? 'text-text-muted line-through' : 'text-text-primary'}>{item.title}</span>
-                    </label>
+                      {editingChecklistId === item.id ? <Input aria-label="Checklist item title" className="min-w-48 flex-1" value={editingChecklistTitle} onChange={(event) => setEditingChecklistTitle(event.target.value)} /> : <span className={item.isCompleted ? 'min-w-48 flex-1 text-text-muted line-through' : 'min-w-48 flex-1 text-text-primary'}>{item.title}</span>}
+                      {staff ? <div className="ml-auto flex items-center gap-1">
+                        {editingChecklistId === item.id ? <Button type="button" size="sm" onClick={() => void runMutation(() => mutations.updateChecklist.mutateAsync({ id: taskData.id, itemId: item.id, title: editingChecklistTitle })).then(() => setEditingChecklistId(null))}>Save</Button> : <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingChecklistId(item.id); setEditingChecklistTitle(item.title) }}>Edit</Button>}
+                        <Button type="button" size="icon" variant="ghost" aria-label="Move checklist item up" onClick={() => moveChecklist(index, -1)} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
+                        <Button type="button" size="icon" variant="ghost" aria-label="Move checklist item down" onClick={() => moveChecklist(index, 1)} disabled={index === (collections.checklist.data?.length ?? 0) - 1}><ArrowDown className="h-4 w-4" /></Button>
+                        <Button type="button" size="icon" variant="ghost" aria-label="Delete checklist item" onClick={() => { if (window.confirm('Delete this checklist item?')) void runMutation(() => mutations.deleteChecklist.mutateAsync({ id: taskData.id, itemId: item.id })) }}><Trash2 className="h-4 w-4" /></Button>
+                      </div> : null}
+                    </div>
                   ))}
                 </div>
                 {staff ? <form className="mt-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); if (checklistTitle.trim()) void mutations.addChecklist.mutateAsync({ id: taskData.id, title: checklistTitle, order: collections.checklist.data?.length ?? 0 }).then(() => setChecklistTitle('')) }}><Input aria-label="New checklist item" value={checklistTitle} onChange={(event) => setChecklistTitle(event.target.value)} /><Button type="submit" isLoading={mutations.addChecklist.isPending}>Add</Button></form> : null}
@@ -116,7 +148,7 @@ export function TaskDetailPage() {
               </Panel>
             </TabsContent>
             <TabsContent value="submissions" className="space-y-5">
-              <SubmissionsPanel task={taskData} submissions={collections.submissions.data} versions={versions.data} selectedSubmission={selectedSubmission} reviewer={reviewer} student={student} uploadError={uploadError} onFile={submitFile} onRevision={(submissionId, reviewerComment) => runMutation(() => mutations.requestRevision.mutateAsync({ submissionId, comment: reviewerComment }))} pending={mutations.initiateUpload.isPending || mutations.requestRevision.isPending} />
+              <SubmissionsPanel task={taskData} submissions={collections.submissions.data} versions={versions.data} selectedSubmission={selectedSubmission} reviewer={reviewer} student={student} uploadError={uploadError} uploadProgress={uploadProgress} onFile={submitFile} onCancelUpload={() => uploadController?.abort()} onDownload={(submissionId, versionId) => mutations.downloadVersion.mutate({ submissionId, versionId })} onRevision={(submissionId, reviewerComment) => runMutation(() => mutations.requestRevision.mutateAsync({ submissionId, comment: reviewerComment }))} pending={mutations.initiateUpload.isPending || mutations.requestRevision.isPending || mutations.downloadVersion.isPending} />
             </TabsContent>
             <TabsContent value="activity" className="space-y-5">
               <Panel title="Assignment history" error={collections.history.isError} onRetry={() => void collections.history.refetch()}>
@@ -165,16 +197,16 @@ function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-3"><dt className="text-text-muted">{label}</dt><dd className="truncate font-medium text-text-primary">{value}</dd></div>
 }
 
-function SubmissionsPanel({ task, submissions, versions, selectedSubmission, reviewer, student, uploadError, onFile, onRevision, pending }: { task: Task; submissions?: Submission[]; versions?: { id: string; versionNumber: number; fileName: string; fileSize: number; fileStatus: string; uploadedAt: string }[]; selectedSubmission?: Submission; reviewer: boolean; student: boolean; uploadError: string | null; onFile: (file: File | undefined) => Promise<void>; onRevision: (submissionId: string, comment: string) => Promise<unknown>; pending: boolean }) {
+function SubmissionsPanel({ task, submissions, versions, selectedSubmission, reviewer, student, uploadError, uploadProgress, onFile, onCancelUpload, onDownload, onRevision, pending }: { task: Task; submissions?: Submission[]; versions?: { id: string; versionNumber: number; fileName: string; fileSize: number; fileStatus: string; uploadedAt: string }[]; selectedSubmission?: Submission; reviewer: boolean; student: boolean; uploadError: string | null; uploadProgress: number | null; onFile: (file: File | undefined) => Promise<void>; onCancelUpload: () => void; onDownload: (submissionId: string, versionId: string) => void; onRevision: (submissionId: string, comment: string) => Promise<unknown>; pending: boolean }) {
   const [reviewComment, setReviewComment] = useState('')
   return (
     <Panel title="Submissions">
       {submissions?.length === 0 ? <EmptyState title="No submissions yet." description={student ? 'Upload is available for assigned task work when backend storage is configured.' : 'No student submission has been recorded.'} /> : null}
       <div className="space-y-3">{submissions?.map((submission) => <div key={submission.id} className="rounded-md border border-border px-3 py-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">Submission {submission.id.slice(0, 8)}</p><Badge variant={submission.status === 'APPROVED' ? 'success' : submission.status === 'REVISION_REQUESTED' ? 'warning' : 'info'}>{submission.status}</Badge></div><p className="mt-1 text-text-secondary">{submission.submittedAt ? formatIstanbulDateTime(submission.submittedAt) : 'Not submitted yet'}</p></div>)}</div>
-      {selectedSubmission ? <div className="mt-4 space-y-2"><h3 className="text-sm font-semibold">Versions</h3>{versions?.map((version) => <div key={version.id} className="rounded-md border border-border px-3 py-2 text-sm"><p className="font-medium">v{version.versionNumber} · {version.fileName}</p><p className="text-text-secondary">{version.fileStatus} · {Math.ceil(version.fileSize / 1024)} KB · {formatIstanbulDateTime(version.uploadedAt)}</p></div>)}</div> : null}
-      {student && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? <div className="mt-4"><FormField label="Submission file" error={uploadError ?? undefined} helperText="Files must be 1 GB or smaller. The current API returns upload metadata but no signed upload URL.">{({ id, describedBy, invalid }) => <Input id={id} type="file" invalid={invalid} aria-describedby={describedBy} onChange={(event) => void onFile(event.currentTarget.files?.[0])} />}</FormField></div> : null}
+      {selectedSubmission ? <div className="mt-4 space-y-2"><h3 className="text-sm font-semibold">Versions</h3>{versions?.map((version) => <div key={version.id} className="rounded-md border border-border px-3 py-2 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">v{version.versionNumber} · {version.fileName}</p>{version.fileStatus === 'CONFIRMED' ? <Button type="button" size="sm" variant="outline" iconBefore={<Download className="h-4 w-4" />} onClick={() => onDownload(selectedSubmission.id, version.id)}>Download</Button> : null}</div><p className="text-text-secondary">{version.fileStatus} · {Math.ceil(version.fileSize / 1024)} KB · {formatIstanbulDateTime(version.uploadedAt)}</p></div>)}</div> : null}
+      {student && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? <div className="mt-4 space-y-2"><FormField label="Submission file" error={uploadError ?? undefined} helperText="Files must be 1 GB or smaller. Uploads use the signed direct storage flow.">{({ id, describedBy, invalid }) => <Input id={id} type="file" invalid={invalid} aria-describedby={describedBy} onChange={(event) => void onFile(event.currentTarget.files?.[0])} />}</FormField>{uploadProgress !== null ? <div className="flex items-center gap-3"><progress className="h-2 flex-1" max={100} value={uploadProgress} aria-label="Upload progress" /><Button type="button" size="sm" variant="outline" onClick={onCancelUpload}>Cancel upload</Button></div> : null}</div> : null}
       {reviewer && selectedSubmission?.status === 'SUBMITTED_FOR_REVIEW' ? <form className="mt-4 space-y-2" onSubmit={(event) => { event.preventDefault(); if (selectedSubmission && reviewComment.trim()) void onRevision(selectedSubmission.id, reviewComment) }}><Textarea aria-label="Revision comment" value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} /><Button type="submit" isLoading={pending} variant="outline" iconBefore={<Send className="h-4 w-4" />}>Request revision</Button></form> : null}
-      <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Paperclip aria-hidden="true" className="mt-0.5 h-3.5 w-3.5" /> Signed download URLs are not exposed for submissions by the current Phase 4 route contract.</p>
+      <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Paperclip aria-hidden="true" className="mt-0.5 h-3.5 w-3.5" /> Download links request fresh temporary signed URLs on demand.</p>
     </Panel>
   )
 }

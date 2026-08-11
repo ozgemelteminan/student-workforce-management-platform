@@ -1,4 +1,4 @@
-import { apiRequest } from '../../../lib/api'
+import { apiRequest, buildApiUrl } from '../../../lib/api'
 import type {
   AssignmentRecommendation,
   Category,
@@ -7,6 +7,7 @@ import type {
   Skill,
   Student,
   Submission,
+  SubmissionDownloadUrl,
   SubmissionUploadIntent,
   SubmissionVersion,
   Task,
@@ -42,6 +43,7 @@ function taskQuery(filters: TaskFilters) {
     difficulty: filters.difficulty,
     categoryId: filters.categoryId,
     studentId: filters.studentId,
+    isAssigned: filters.isAssigned === undefined ? undefined : String(filters.isAssigned),
     deadlineFrom: filters.deadlineFrom,
     deadlineTo: filters.deadlineTo,
   })
@@ -99,6 +101,18 @@ export function setChecklistItem(taskId: string, itemId: string, completed: bool
   return apiRequest<TaskChecklistItem>(`/tasks/${taskId}/checklist/${itemId}/${completed ? 'complete' : 'uncomplete'}`, { method: 'POST' })
 }
 
+export function updateChecklistItem(taskId: string, itemId: string, title: string) {
+  return apiRequest<TaskChecklistItem>(`/tasks/${taskId}/checklist/${itemId}`, { method: 'PUT', body: { title } })
+}
+
+export function deleteChecklistItem(taskId: string, itemId: string) {
+  return apiRequest<void>(`/tasks/${taskId}/checklist/${itemId}`, { method: 'DELETE' })
+}
+
+export function reorderChecklist(taskId: string, items: { checklistItemId: string; order: number }[]) {
+  return apiRequest<TaskChecklistItem[]>(`/tasks/${taskId}/checklist/reorder`, { method: 'PUT', body: { items } })
+}
+
 export function getComments(taskId: string, signal?: AbortSignal) {
   return apiRequest<TaskComment[]>(`/tasks/${taskId}/comments`, { signal })
 }
@@ -119,6 +133,18 @@ export function getRequiredSkills(taskId: string, signal?: AbortSignal) {
   return apiRequest<TaskRequiredSkill[]>(`/tasks/${taskId}/skills`, { signal })
 }
 
+export function addRequiredSkill(taskId: string, skillId: string, minimumLevel: string) {
+  return apiRequest<TaskRequiredSkill>(`/tasks/${taskId}/skills`, { method: 'POST', body: { skillId, minimumLevel } })
+}
+
+export function updateRequiredSkill(taskId: string, skillId: string, minimumLevel: string) {
+  return apiRequest<TaskRequiredSkill>(`/tasks/${taskId}/skills/${skillId}`, { method: 'PUT', body: { minimumLevel } })
+}
+
+export function deleteRequiredSkill(taskId: string, skillId: string) {
+  return apiRequest<void>(`/tasks/${taskId}/skills/${skillId}`, { method: 'DELETE' })
+}
+
 export function getAssignmentHistory(taskId: string, signal?: AbortSignal) {
   return apiRequest<TaskAssignmentHistory[]>(`/tasks/${taskId}/history`, { signal })
 }
@@ -133,10 +159,16 @@ export function getSubmissions(taskId: string, signal?: AbortSignal) {
 
 export function initiateSubmissionUpload(taskId: string, file: File, contentHash?: string) {
   const extension = file.name.includes('.') ? `.${file.name.split('.').pop()}` : ''
-  return apiRequest<SubmissionUploadIntent>(`/tasks/${taskId}/submissions/uploads`, {
+  return apiRequest<SubmissionUploadIntent>(`/tasks/${taskId}/uploads/initiate`, {
     method: 'POST',
     body: { fileName: file.name, fileSize: file.size, mimeType: file.type || 'application/octet-stream', fileExtension: extension.toLowerCase(), contentHash },
   })
+}
+
+export async function uploadSubmissionFile(taskId: string, file: File, options: { signal?: AbortSignal; onProgress?: (progress: number) => void } = {}) {
+  const intent = await initiateSubmissionUpload(taskId, file)
+  await putSignedUpload(intent, file, options)
+  return completeSubmissionUploadForTask(taskId, intent.submissionVersionId)
 }
 
 export function getSubmissionVersions(taskId: string, submissionId: string, signal?: AbortSignal) {
@@ -146,6 +178,18 @@ export function getSubmissionVersions(taskId: string, submissionId: string, sign
 
 export function completeSubmissionUpload(versionId: string) {
   return apiRequest<SubmissionVersion>(`/submissions/versions/${versionId}/complete`, { method: 'POST' })
+}
+
+export function completeSubmissionUploadForTask(taskId: string, versionId: string) {
+  return apiRequest<SubmissionVersion>(`/tasks/${taskId}/uploads/${versionId}/complete`, { method: 'POST' })
+}
+
+export function getSubmissionDownloadUrl(submissionId: string, signal?: AbortSignal) {
+  return apiRequest<SubmissionDownloadUrl>(`/submissions/${submissionId}/download-url`, { signal })
+}
+
+export function getSubmissionVersionDownloadUrl(submissionId: string, versionId: string, signal?: AbortSignal) {
+  return apiRequest<SubmissionDownloadUrl>(`/submissions/${submissionId}/versions/${versionId}/download-url`, { signal })
 }
 
 export function approveSubmission(submissionId: string, reviewerComment?: string) {
@@ -174,4 +218,37 @@ export function getSkills(signal?: AbortSignal) {
 
 export function getStudents(search?: string, signal?: AbortSignal) {
   return apiRequest<PaginatedResult<Student>>(`/students${params({ page: 1, pageSize: 50, search })}`, { signal })
+}
+
+function resolveSignedUrl(url: string) {
+  return new URL(url, buildApiUrl('/')).toString()
+}
+
+function putSignedUpload(intent: SubmissionUploadIntent, file: File, options: { signal?: AbortSignal; onProgress?: (progress: number) => void }) {
+  return new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest()
+    request.open(intent.uploadMethod || 'PUT', resolveSignedUrl(intent.signedUploadUrl))
+    Object.entries(intent.requiredHeaders ?? {}).forEach(([key, value]) => request.setRequestHeader(key, value))
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) options.onProgress?.(Math.round((event.loaded / event.total) * 100))
+    }
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) resolve()
+      else reject(new Error('Signed upload failed.'))
+    }
+    request.onerror = () => reject(new Error('Signed upload failed.'))
+    request.onabort = () => reject(new DOMException('Upload cancelled.', 'AbortError'))
+    options.signal?.addEventListener('abort', () => request.abort(), { once: true })
+    request.send(file)
+  })
+}
+
+export function openSignedDownload(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = resolveSignedUrl(url)
+  anchor.rel = 'noopener'
+  anchor.download = ''
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
 }

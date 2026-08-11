@@ -8,7 +8,7 @@ const priorities: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
 const sortBy = ['deadline', 'priority', 'created', 'workload'] as const
 const sortDirection = ['asc', 'desc'] as const
 
-export type TaskView = 'all' | 'my' | 'overdue' | 'due-week' | 'needs-review'
+export type TaskView = 'all' | 'my' | 'overdue' | 'due-week' | 'needs-review' | 'unassigned'
 
 export function filtersFromSearchParams(params: URLSearchParams): TaskFilters & { view: TaskView } {
   const page = parsePositiveInt(params.get('page'), 1)
@@ -24,6 +24,7 @@ export function filtersFromSearchParams(params: URLSearchParams): TaskFilters & 
     status: parseEnum(params.get('status'), statuses),
     priority: parseEnum(params.get('priority'), priorities),
     categoryId: clean(params.get('categoryId')),
+    isAssigned: parseBoolean(params.get('isAssigned')),
   }
   return applyTaskView(filters)
 }
@@ -39,6 +40,7 @@ export function filtersToSearchParams(filters: TaskFilters & { view: TaskView })
   set(params, 'status', filters.status)
   set(params, 'priority', filters.priority)
   set(params, 'categoryId', filters.categoryId)
+  set(params, 'isAssigned', filters.isAssigned === undefined ? undefined : String(filters.isAssigned))
   return params
 }
 
@@ -46,6 +48,7 @@ export function applyTaskView(filters: TaskFilters & { view: TaskView }): TaskFi
   const next = { ...filters }
   if (next.view === 'overdue') next.status = 'OVERDUE'
   if (next.view === 'needs-review') next.status = 'SUBMITTED_FOR_REVIEW'
+  if (next.view === 'unassigned') next.isAssigned = false
   if (next.view === 'due-week') {
     const start = fromZonedTime(startOfDay(new Date()), DISPLAY_TIME_ZONE)
     const end = fromZonedTime(addDays(startOfDay(new Date()), 7), DISPLAY_TIME_ZONE)
@@ -65,7 +68,13 @@ function parseEnum<const T extends readonly string[]>(value: string | null, allo
 }
 
 function parseView(value: string | null): TaskView {
-  return value === 'my' || value === 'overdue' || value === 'due-week' || value === 'needs-review' ? value : 'all'
+  return value === 'my' || value === 'overdue' || value === 'due-week' || value === 'needs-review' || value === 'unassigned' ? value : 'all'
+}
+
+function parseBoolean(value: string | null): boolean | undefined {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return undefined
 }
 
 function clean(value: string | null) {

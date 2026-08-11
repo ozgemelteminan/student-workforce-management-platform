@@ -15,6 +15,7 @@ const viewLabels: Record<TaskView, string> = {
   overdue: 'Overdue',
   'due-week': 'Due this week',
   'needs-review': 'Needs review',
+  unassigned: 'Unassigned',
 }
 
 export function TasksPage() {

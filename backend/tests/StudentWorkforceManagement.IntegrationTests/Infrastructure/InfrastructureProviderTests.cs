@@ -62,7 +62,7 @@ public sealed class InfrastructureProviderTests
     public async System.Threading.Tasks.Task Local_file_storage_generates_opaque_keys_and_blocks_traversal()
     {
         var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var storage = new LocalFileStorage(Options.Create(new StorageOptions { Provider = "Local", LocalRootPath = root, SignedUrlLifetimeMinutes = 15 }));
+        var storage = new LocalFileStorage(Options.Create(new StorageOptions { Provider = "Local", LocalRootPath = root, SignedUrlLifetimeMinutes = 15 }), DataProtectionProvider.Create(new DirectoryInfo(root)));
 
         var target = await storage.CreateUploadTargetAsync(new UploadTargetRequest("report.pdf", 100, "application/pdf", ".pdf", "department-files", false));
 

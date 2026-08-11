@@ -49,8 +49,14 @@ export type TaskFilters = {
   difficulty?: TaskDifficulty
   categoryId?: string
   studentId?: string
+  isAssigned?: boolean
   deadlineFrom?: string
   deadlineTo?: string
+}
+
+export type RequiredSkillPayload = {
+  skillId: string
+  minimumLevel: SkillLevel
 }
 
 export type TaskFormPayload = {
@@ -63,6 +69,7 @@ export type TaskFormPayload = {
   startDate?: string
   deadline: string
   estimatedDurationMinutes: number
+  requiredSkills?: RequiredSkillPayload[]
 }
 
 export type UpdateTaskPayload = TaskFormPayload & {
@@ -172,6 +179,10 @@ export type SubmissionUploadIntent = {
   mimeType: string
   fileExtension: string
   fileStatus: FileStatus
+  signedUploadUrl: string
+  uploadMethod: string
+  requiredHeaders: Record<string, string>
+  expiresAt: string
 }
 
 export type SubmissionVersion = {
@@ -198,4 +209,12 @@ export type Feedback = {
   rating?: number
   comment?: string
   createdAt: string
+}
+
+export type SubmissionDownloadUrl = {
+  submissionVersionId: string
+  fileName: string
+  fileSize: number
+  signedDownloadUrl: string
+  expiresAt: string
 }

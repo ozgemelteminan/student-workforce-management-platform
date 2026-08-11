@@ -5,10 +5,13 @@ using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Time;
+using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
 using StudentWorkforceManagement.Application.Submissions.Commands.ReviewSubmission;
 using StudentWorkforceManagement.Application.Tasks.Commands.AddTaskDependency;
+using StudentWorkforceManagement.Application.Tasks.Commands.Checklist;
 using StudentWorkforceManagement.Application.Tasks.Commands.ReassignTask;
+using StudentWorkforceManagement.Application.Tasks.Commands.RequiredSkills;
 using StudentWorkforceManagement.Application.Tasks.Queries.GetTasks;
 using StudentWorkforceManagement.Application.Tasks.Services;
 using StudentWorkforceManagement.Domain.Entities;
@@ -141,6 +144,92 @@ public sealed class ApplicationWorkflowTests
         Assert.True(page.HasNextPage);
         Assert.Single(page.Items);
         Assert.Equal(90, page.Items.Single().EstimatedDurationMinutes);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Task_query_filters_unassigned_server_side()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        SeedTask(context, title: "Assigned Work", assignedStudentId: student.Id);
+        SeedTask(context, title: "Unassigned Work", assignedStudentId: null);
+        await context.SaveChangesAsync();
+        var handler = new GetTasksQueryHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER));
+
+        var page = await handler.Handle(new GetTasksQuery { IsAssigned = false, Page = 1, PageSize = 10, Search = "work" }, CancellationToken.None);
+
+        Assert.Single(page.Items);
+        Assert.Equal("Unassigned Work", page.Items.Single().Title);
+        Assert.Null(page.Items.Single().AssignedStudentId);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Marketplace_listing_query_contains_safe_task_summary_without_detail_fetches()
+    {
+        await using var context = CreateContext();
+        var category = SeedCategory(context);
+        var skill = new Skill { Id = Guid.NewGuid(), Name = "Data QA" };
+        var task = SeedTask(context, "Marketplace Task", category.Id);
+        task.Description = "Public task summary";
+        task.Category = category;
+        context.Skills.Add(skill);
+        context.TaskRequiredSkills.Add(new TaskRequiredSkill { Id = Guid.NewGuid(), TaskId = task.Id, Task = task, SkillId = skill.Id, Skill = skill, MinimumLevel = SkillLevel.INTERMEDIATE });
+        context.MarketplaceListings.Add(new MarketplaceListing { Id = Guid.NewGuid(), TaskId = task.Id, Task = task, Status = MarketplaceListingStatus.PUBLISHED, ApprovalMode = MarketplaceApprovalMode.MANUAL_APPROVAL, PublishedAt = DateTimeOffset.UtcNow });
+        await context.SaveChangesAsync();
+        var handler = new GetMarketplaceListingsQueryHandler(context);
+
+        var page = await handler.Handle(new GetMarketplaceListingsQuery { Status = MarketplaceListingStatus.PUBLISHED, Page = 1, PageSize = 10, Search = "marketplace" }, CancellationToken.None);
+
+        var listing = Assert.Single(page.Items);
+        Assert.Equal("Marketplace Task", listing.TaskSummary?.Title);
+        Assert.Equal("Public task summary", listing.TaskSummary?.Description);
+        Assert.Equal("Data QA", Assert.Single(listing.TaskSummary!.RequiredSkills).SkillName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Required_skill_mutations_add_update_delete_and_reject_duplicates()
+    {
+        await using var context = CreateContext();
+        var task = SeedTask(context);
+        var skill = new Skill { Id = Guid.NewGuid(), Name = "Research" };
+        context.Skills.Add(skill);
+        await context.SaveChangesAsync();
+        var handler = new TaskRequiredSkillCommandHandler(context);
+
+        var added = await handler.Handle(new AddTaskRequiredSkillCommand(task.Id, skill.Id, SkillLevel.BEGINNER), CancellationToken.None);
+        await context.SaveChangesAsync();
+        await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new AddTaskRequiredSkillCommand(task.Id, skill.Id, SkillLevel.BEGINNER), CancellationToken.None));
+        var updated = await handler.Handle(new UpdateTaskRequiredSkillCommand(task.Id, skill.Id, SkillLevel.ADVANCED), CancellationToken.None);
+        await handler.Handle(new DeleteTaskRequiredSkillCommand(task.Id, skill.Id), CancellationToken.None);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(SkillLevel.BEGINNER, added.MinimumLevel);
+        Assert.Equal(SkillLevel.ADVANCED, updated.MinimumLevel);
+        Assert.Empty(context.TaskRequiredSkills);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Checklist_update_delete_and_reorder_are_task_scoped_and_deterministic()
+    {
+        await using var context = CreateContext();
+        var task = SeedTask(context);
+        var otherTask = SeedTask(context);
+        await context.SaveChangesAsync();
+        var handler = new TaskChecklistCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER), new FakeClock());
+        var first = await handler.Handle(new AddChecklistItemCommand(task.Id, "First", 0), CancellationToken.None);
+        var second = await handler.Handle(new AddChecklistItemCommand(task.Id, "Second", 1), CancellationToken.None);
+        var foreign = await handler.Handle(new AddChecklistItemCommand(otherTask.Id, "Foreign", 0), CancellationToken.None);
+
+        var updated = await handler.Handle(new UpdateChecklistItemCommand(task.Id, first.Id, "Updated first"), CancellationToken.None);
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new UpdateChecklistItemCommand(task.Id, foreign.Id, "Nope"), CancellationToken.None));
+        await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new ReorderChecklistCommand(task.Id, new[] { new ReorderChecklistItem(second.Id, 0), new ReorderChecklistItem(foreign.Id, 1) }), CancellationToken.None));
+        var reordered = await handler.Handle(new ReorderChecklistCommand(task.Id, new[] { new ReorderChecklistItem(second.Id, 0), new ReorderChecklistItem(first.Id, 1) }), CancellationToken.None);
+        await handler.Handle(new DeleteChecklistItemCommand(task.Id, first.Id), CancellationToken.None);
+        await context.SaveChangesAsync();
+
+        Assert.Equal("Updated first", updated.Title);
+        Assert.Equal(new[] { second.Id, first.Id }, reordered.Select(item => item.Id).ToArray());
+        Assert.Single(context.TaskChecklistItems.Where(item => item.TaskId == task.Id));
     }
 
     private static ApplicationDbContext CreateContext()

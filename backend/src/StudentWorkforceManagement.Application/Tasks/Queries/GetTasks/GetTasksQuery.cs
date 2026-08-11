@@ -16,6 +16,7 @@ public sealed record GetTasksQuery : PagedQuery, IRequest<PaginatedResult<TaskDt
     public TaskPriority? Priority { get; init; }
     public TaskDifficulty? Difficulty { get; init; }
     public Guid? CategoryId { get; init; }
+    public bool? IsAssigned { get; init; }
     public DateTimeOffset? DeadlineFrom { get; init; }
     public DateTimeOffset? DeadlineTo { get; init; }
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AnyRole;
@@ -58,6 +59,7 @@ public sealed class GetTasksQueryHandler(StudentWorkforceManagement.Application.
         if (request.Priority.HasValue) query = query.Where(task => task.Priority == request.Priority.Value);
         if (request.Difficulty.HasValue) query = query.Where(task => task.Difficulty == request.Difficulty.Value);
         if (request.CategoryId.HasValue) query = query.Where(task => task.CategoryId == request.CategoryId.Value);
+        if (request.IsAssigned.HasValue) query = request.IsAssigned.Value ? query.Where(task => task.AssignedStudentId != null) : query.Where(task => task.AssignedStudentId == null);
         if (request.DeadlineFrom.HasValue) query = query.Where(task => task.Deadline >= request.DeadlineFrom.Value);
         if (request.DeadlineTo.HasValue) query = query.Where(task => task.Deadline <= request.DeadlineTo.Value);
 

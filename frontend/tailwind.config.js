@@ -34,6 +34,17 @@ export default {
       boxShadow: {
         elevated: 'var(--shadow-elevated)',
       },
+      zIndex: {
+        base: '0',
+        sticky: '20',
+        dropdown: '40',
+        popover: '40',
+        mobileNav: '50',
+        drawer: '50',
+        dialog: '50',
+        commandPalette: '60',
+        toast: '60',
+      },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },

@@ -16,7 +16,20 @@ export function AppProviders({ children }: AppProvidersProps) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         {children}
-        <Toaster richColors closeButton position="top-right" />
+        <Toaster
+          closeButton
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              toast: 'border-border bg-surface text-text-primary shadow-elevated',
+              title: 'text-text-primary',
+              description: 'text-text-secondary',
+              actionButton: 'bg-brand text-text-inverse',
+              cancelButton: 'bg-surface-secondary text-text-primary',
+              closeButton: 'bg-surface border-border text-text-secondary',
+            },
+          }}
+        />
       </AuthProvider>
     </QueryClientProvider>
   )

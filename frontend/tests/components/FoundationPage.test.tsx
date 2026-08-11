@@ -11,6 +11,7 @@ describe('FoundationPage', () => {
       </AppProviders>,
     )
 
-    expect(screen.getByRole('heading', { name: /student workforce management platform/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /dashboard/i })).toBeInTheDocument()
+    expect(screen.getByText(/phase 2 establishes the shared shell/i)).toBeInTheDocument()
   })
 })

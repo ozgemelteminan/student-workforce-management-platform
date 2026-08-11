@@ -5,6 +5,7 @@ using StudentWorkforceManagement.Api.Middleware;
 using StudentWorkforceManagement.Application;
 using StudentWorkforceManagement.Infrastructure;
 using StudentWorkforceManagement.Infrastructure.Hosting;
+using StudentWorkforceManagement.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ if (app.Environment.IsDevelopment())
         options.DocumentTitle = "Student Workforce Management API v1";
         options.SwaggerEndpoint("/openapi/v1.json", "Student Workforce Management API v1");
     });
+    await DevelopmentAdminSeeder.SeedAsync(app.Services, app.Environment, app.Configuration);
 }
 else
 {

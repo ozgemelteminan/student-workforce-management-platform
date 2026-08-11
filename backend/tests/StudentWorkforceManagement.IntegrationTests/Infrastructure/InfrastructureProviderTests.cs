@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -29,6 +31,48 @@ namespace StudentWorkforceManagement.IntegrationTests.Infrastructure;
 
 public sealed class InfrastructureProviderTests
 {
+    [Fact]
+    public async System.Threading.Tasks.Task Development_admin_seeder_creates_real_admin_once_and_does_not_reset_password()
+    {
+        await using var provider = CreateDevelopmentAdminSeedProvider();
+        var configuration = DevelopmentAdminConfiguration(enabled: true);
+        var environment = new FakeHostEnvironment("Development");
+
+        await DevelopmentAdminSeeder.SeedAsync(provider, environment, configuration);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var passwordService = scope.ServiceProvider.GetRequiredService<IdentityPasswordService>();
+            var user = await context.Users.Include(entity => entity.Role).SingleAsync(entity => entity.Email == "admin.dev@local.test");
+            var firstHash = user.PasswordHash;
+
+            Assert.True(user.IsActive);
+            Assert.Null(user.DeletedAt);
+            Assert.Equal(UserRole.ADMIN, user.Role?.Name);
+            Assert.True(passwordService.VerifyPassword(user, "DevAdmin123"));
+
+            await DevelopmentAdminSeeder.SeedAsync(provider, environment, configuration);
+            var users = await context.Users.Include(entity => entity.Role).Where(entity => entity.Email == "admin.dev@local.test").ToListAsync();
+
+            Assert.Single(users);
+            Assert.Equal(firstHash, users.Single().PasswordHash);
+        }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Development_admin_seeder_is_gated_by_environment_and_configuration()
+    {
+        await using var provider = CreateDevelopmentAdminSeedProvider();
+
+        await DevelopmentAdminSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"), DevelopmentAdminConfiguration(enabled: true));
+        await DevelopmentAdminSeeder.SeedAsync(provider, new FakeHostEnvironment("Development"), DevelopmentAdminConfiguration(enabled: false));
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Empty(context.Users);
+        Assert.Empty(context.Roles);
+    }
+
     [Fact]
     public void Identity_password_service_hashes_and_verifies_without_plaintext_storage()
     {
@@ -271,6 +315,31 @@ public sealed class InfrastructureProviderTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         return new ApplicationDbContext(options);
+    }
+
+    private static ServiceProvider CreateDevelopmentAdminSeedProvider()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddScoped<IdentityPasswordService>();
+        services.AddScoped<StudentWorkforceManagement.Application.Auth.Services.IPasswordService>(serviceProvider => serviceProvider.GetRequiredService<IdentityPasswordService>());
+        return services.BuildServiceProvider();
+    }
+
+    private static IConfiguration DevelopmentAdminConfiguration(bool enabled)
+    {
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DevelopmentAdmin:Enabled"] = enabled.ToString(),
+                ["DevelopmentAdmin:Email"] = "admin.dev@local.test",
+                ["DevelopmentAdmin:DisplayName"] = "Development Admin",
+                ["DevelopmentAdmin:Password"] = "DevAdmin123"
+            })
+            .Build();
     }
 
     private static DataProtectionEmailSecretProtector CreateDataProtectionEmailSecretProtector(string keyRingPath)

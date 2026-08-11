@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { CommandPalette } from '../../src/components/layout/CommandPalette'
@@ -81,12 +82,15 @@ describe('Phase 2 app shell infrastructure', () => {
   it('exposes a visible topbar command trigger', async () => {
     const user = userEvent.setup()
     const onCommandPalette = vi.fn()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
     render(
       <MemoryRouter>
-        <TooltipProvider>
-          <Topbar user={admin} session={session} onMobileMenu={() => undefined} onCommandPalette={onCommandPalette} onLogout={() => undefined} />
-        </TooltipProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Topbar user={admin} session={session} onMobileMenu={() => undefined} onCommandPalette={onCommandPalette} onLogout={() => undefined} />
+          </TooltipProvider>
+        </QueryClientProvider>
       </MemoryRouter>,
     )
 

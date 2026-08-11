@@ -24,6 +24,7 @@ using StudentWorkforceManagement.Application.Exports.Commands;
 using StudentWorkforceManagement.Application.Feedback.Commands;
 using StudentWorkforceManagement.Application.Feedback.Queries;
 using StudentWorkforceManagement.Application.Files.Commands;
+using StudentWorkforceManagement.Application.Files.DTOs;
 using StudentWorkforceManagement.Application.Files.Queries;
 using StudentWorkforceManagement.Application.Marketplace.Commands;
 using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
@@ -329,14 +330,25 @@ public static class V1Endpoints
     private static void MapFiles(RouteGroupBuilder api)
     {
         var files = api.MapGroup("/files").RequireAuthorization().WithTags("Files");
-        files.MapGet("/", async ([AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetDepartmentFilesQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search }, cancellationToken)));
-        files.MapPost("/uploads", async (DepartmentFileUploadRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/files", await sender.Send(new InitiateDepartmentFileUploadCommand(request.FolderId, request.FileName, request.FileSize, request.MimeType, request.FileExtension, request.ContentHash), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        files.MapPost("/{id:guid}/complete", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new CompleteDepartmentFileUploadCommand(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        files.MapGet("/{id:guid}/download", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetDepartmentFileDownloadQuery(id), cancellationToken)));
+        files.MapGet("/", async ([AsParameters] PageParams page, Guid? folderId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetDepartmentFilesQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search, FolderId = folderId }, cancellationToken)))
+            .Produces<PaginatedResult<DepartmentFileDto>>(StatusCodes.Status200OK);
+        files.MapPost("/uploads", async (DepartmentFileUploadRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/files", await sender.Send(new InitiateDepartmentFileUploadCommand(request.FolderId, request.FileName, request.FileSize, request.MimeType, request.FileExtension, request.ContentHash), cancellationToken)))
+            .RequireAuthorization("STAFF_TASK_MANAGEMENT")
+            .Produces<FileUploadIntentDto>(StatusCodes.Status201Created);
+        files.MapPost("/{id:guid}/complete", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new CompleteDepartmentFileUploadCommand(id), cancellationToken)))
+            .RequireAuthorization("STAFF_TASK_MANAGEMENT")
+            .Produces<DepartmentFileDto>(StatusCodes.Status200OK);
+        files.MapGet("/{id:guid}/download", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetDepartmentFileDownloadQuery(id), cancellationToken)))
+            .Produces<AuthorizedDownloadDto>(StatusCodes.Status200OK);
         files.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteDepartmentFileCommand(id), cancellationToken); return Results.NoContent(); }).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        files.MapGet("/folders", async (Guid? parentFolderId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetFileFoldersQuery(parentFolderId), cancellationToken)));
-        files.MapPost("/folders", async (CreateFileFolderCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/files/folders", await sender.Send(request, cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        files.MapPut("/folders/{id:guid}", async (Guid id, RenameFolderRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new RenameFileFolderCommand(id, request.Name), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        files.MapGet("/folders", async (Guid? parentFolderId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetFileFoldersQuery(parentFolderId), cancellationToken)))
+            .Produces<IReadOnlyCollection<FileFolderDto>>(StatusCodes.Status200OK);
+        files.MapPost("/folders", async (CreateFileFolderCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/files/folders", await sender.Send(request, cancellationToken)))
+            .RequireAuthorization("STAFF_TASK_MANAGEMENT")
+            .Produces<FileFolderDto>(StatusCodes.Status201Created);
+        files.MapPut("/folders/{id:guid}", async (Guid id, RenameFolderRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new RenameFileFolderCommand(id, request.Name), cancellationToken)))
+            .RequireAuthorization("STAFF_TASK_MANAGEMENT")
+            .Produces<FileFolderDto>(StatusCodes.Status200OK);
         files.MapDelete("/folders/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteFileFolderCommand(id), cancellationToken); return Results.NoContent(); }).RequireAuthorization("STAFF_TASK_MANAGEMENT");
     }
 

@@ -26,6 +26,9 @@ const StudentDetailPage = lazy(() => import('../../pages/students/StudentDetailP
 const SchedulePage = lazy(() => import('../../pages/schedule/SchedulePage').then((module) => ({ default: module.SchedulePage })))
 const RequestsPage = lazy(() => import('../../pages/requests/RequestsPage').then((module) => ({ default: module.RequestsPage })))
 const ReviewsPage = lazy(() => import('../../pages/reviews/ReviewsPage').then((module) => ({ default: module.ReviewsPage })))
+const FilesPage = lazy(() => import('../../pages/files/FilesPage').then((module) => ({ default: module.FilesPage })))
+const AnnouncementsPage = lazy(() => import('../../pages/announcements/AnnouncementsPage').then((module) => ({ default: module.AnnouncementsPage })))
+const AnnouncementDetailPage = lazy(() => import('../../pages/announcements/AnnouncementDetailPage').then((module) => ({ default: module.AnnouncementDetailPage })))
 
 const devRoutes = import.meta.env.DEV ? [{ path: '/__dev/ui', element: <UiShowcasePage /> }] : []
 const allRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER', 'REVIEWER', 'STUDENT']
@@ -59,8 +62,8 @@ export const router = createBrowserRouter([
           { path: '/schedule', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<SchedulePage />) }] },
           { path: '/requests', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<RequestsPage />) }] },
           { path: '/reviews', element: <RequireRole roles={reviewRoles} />, children: [{ index: true, element: lazyPage(<ReviewsPage />) }] },
-          roleRoute('/files', 'Files', allRoles),
-          roleRoute('/announcements', 'Announcements', allRoles),
+          { path: '/files', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<FilesPage />) }] },
+          { path: '/announcements', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<AnnouncementsPage />) }, { path: ':announcementId', element: lazyPage(<AnnouncementDetailPage />) }] },
           roleRoute('/templates', 'Templates', staffRoles),
           roleRoute('/recurring-tasks', 'Recurring Tasks', staffRoles),
           roleRoute('/notifications', 'Notifications', allRoles),

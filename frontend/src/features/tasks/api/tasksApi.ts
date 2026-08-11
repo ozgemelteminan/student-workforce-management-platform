@@ -1,4 +1,5 @@
-import { apiRequest, buildApiUrl } from '../../../lib/api'
+import { apiRequest } from '../../../lib/api'
+import { openSignedDownload as openTemporaryDownload, uploadSignedFile } from '../../../lib/signed-urls'
 import type {
   AssignmentRecommendation,
   Category,
@@ -167,7 +168,7 @@ export function initiateSubmissionUpload(taskId: string, file: File, contentHash
 
 export async function uploadSubmissionFile(taskId: string, file: File, options: { signal?: AbortSignal; onProgress?: (progress: number) => void } = {}) {
   const intent = await initiateSubmissionUpload(taskId, file)
-  await putSignedUpload(intent, file, options)
+  await uploadSignedFile(intent, file, options)
   return completeSubmissionUploadForTask(taskId, intent.submissionVersionId)
 }
 
@@ -220,35 +221,6 @@ export function getStudents(search?: string, signal?: AbortSignal) {
   return apiRequest<PaginatedResult<Student>>(`/students${params({ page: 1, pageSize: 50, search })}`, { signal })
 }
 
-function resolveSignedUrl(url: string) {
-  return new URL(url, buildApiUrl('/')).toString()
-}
-
-function putSignedUpload(intent: SubmissionUploadIntent, file: File, options: { signal?: AbortSignal; onProgress?: (progress: number) => void }) {
-  return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest()
-    request.open(intent.uploadMethod || 'PUT', resolveSignedUrl(intent.signedUploadUrl))
-    Object.entries(intent.requiredHeaders ?? {}).forEach(([key, value]) => request.setRequestHeader(key, value))
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable) options.onProgress?.(Math.round((event.loaded / event.total) * 100))
-    }
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) resolve()
-      else reject(new Error('Signed upload failed.'))
-    }
-    request.onerror = () => reject(new Error('Signed upload failed.'))
-    request.onabort = () => reject(new DOMException('Upload cancelled.', 'AbortError'))
-    options.signal?.addEventListener('abort', () => request.abort(), { once: true })
-    request.send(file)
-  })
-}
-
 export function openSignedDownload(url: string) {
-  const anchor = document.createElement('a')
-  anchor.href = resolveSignedUrl(url)
-  anchor.rel = 'noopener'
-  anchor.download = ''
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
+  openTemporaryDownload({ downloadUrl: url })
 }

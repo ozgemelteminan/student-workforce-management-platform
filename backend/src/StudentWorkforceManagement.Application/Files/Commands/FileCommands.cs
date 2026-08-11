@@ -79,7 +79,7 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
         {
             throw new NotFoundException("FileFolder", request.FolderId.Value);
         }
-        var storageKey = $"department-files/{Guid.NewGuid():N}{upload.FileExtension}";
+        var target = await storage.CreateUploadTargetAsync(new UploadTargetRequest(upload.FileName, upload.FileSizeBytes, upload.MimeType, upload.FileExtension, "department-files", false), cancellationToken);
         var file = new DepartmentFile
         {
             Id = Guid.NewGuid(),
@@ -89,7 +89,7 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
             File = new FileMetadata
             {
                 FileName = upload.FileName,
-                StorageKey = storageKey,
+                StorageKey = target.StorageKey,
                 FileSize = upload.FileSizeBytes,
                 MimeType = upload.MimeType,
                 FileExtension = upload.FileExtension,
@@ -98,7 +98,7 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
         };
         dbContext.DepartmentFiles.Add(file);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return new FileUploadIntentDto(file.Id, storageKey, file.File.FileName, file.File.FileSize, file.File.MimeType, file.File.FileExtension, file.FileStatus);
+        return new FileUploadIntentDto(file.Id, target.StorageKey, file.File.FileName, file.File.FileSize, file.File.MimeType, file.File.FileExtension, file.FileStatus, target.UploadUrl, target.UploadMethod, target.RequiredHeaders ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), target.ExpiresAt);
     }
 
     public async System.Threading.Tasks.Task<DepartmentFileDto> Handle(CompleteDepartmentFileUploadCommand request, CancellationToken cancellationToken)

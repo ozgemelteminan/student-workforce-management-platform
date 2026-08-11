@@ -48,6 +48,21 @@ export const queryKeys = {
     queue: () => [...queryKeys.reviews.all, 'queue'] as const,
     versions: (submissionId: string) => [...queryKeys.reviews.all, 'submission', submissionId, 'versions'] as const,
   },
+  files: {
+    all: ['files'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.files.all, 'list', filters] as const,
+    folders: (parentFolderId: string | null = null) => [...queryKeys.files.all, 'folders', parentFolderId ?? 'root'] as const,
+  },
+  announcements: {
+    all: ['announcements'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.announcements.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.announcements.all, 'detail', id] as const,
+  },
+  notifications: {
+    all: ['notifications'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.notifications.all, 'list', filters] as const,
+    unreadCount: () => [...queryKeys.notifications.all, 'unread-count'] as const,
+  },
   categories: {
     all: ['categories'] as const,
   },

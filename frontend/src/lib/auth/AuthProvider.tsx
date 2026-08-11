@@ -59,7 +59,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!sessionId) {
       throw new Error('Login response access token did not include a session id claim.')
     }
-    const nextSession: AuthSession = { ...response, sessionId }
+    const nextSession = normalizeSession(response, sessionId)
     commitSession(nextSession)
   }, [clearUserScopedQueries, commitSession])
 
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return false
     }
 
-    const rotatedSession: AuthSession = { ...rotation, sessionId }
+    const rotatedSession = normalizeSession(rotation, sessionId)
     commitSession(rotatedSession)
 
     return true
@@ -160,4 +160,20 @@ export function useAuth() {
 function isFutureInstant(value: string, skewMs = 0): boolean {
   const time = Date.parse(value)
   return Number.isFinite(time) && time - skewMs > Date.now()
+}
+
+function normalizeSession(response: AuthSession, sessionId: string): AuthSession {
+  const accessTokenExpiresAt = response.accessTokenExpiresAt || response.expiresAt
+  const sessionExpiresAt = response.sessionExpiresAt || response.expiresAt
+  if (!accessTokenExpiresAt || !sessionExpiresAt || !response.refreshTokenExpiresAt) {
+    throw new Error('Authentication response did not include required session expiration fields.')
+  }
+
+  return {
+    ...response,
+    sessionId,
+    expiresAt: response.expiresAt || accessTokenExpiresAt,
+    accessTokenExpiresAt,
+    sessionExpiresAt,
+  }
 }

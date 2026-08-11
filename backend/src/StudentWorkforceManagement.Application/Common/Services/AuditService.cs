@@ -1,5 +1,6 @@
 using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Security;
+using System.Text.Json;
 using Announcement = StudentWorkforceManagement.Domain.Entities.Announcement;
 using AuditLog = StudentWorkforceManagement.Domain.Entities.AuditLog;
 using AvailabilityEntity = StudentWorkforceManagement.Domain.Entities.Availability;
@@ -48,10 +49,15 @@ public sealed class AuditService(IApplicationDbContext dbContext, ICurrentUserSe
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            OldValue = oldValue,
-            NewValue = newValue
+            OldValue = ToJsonValue(oldValue),
+            NewValue = ToJsonValue(newValue)
         });
 
         return System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    private static string? ToJsonValue(string? value)
+    {
+        return value is null ? null : JsonSerializer.Serialize(value);
     }
 }

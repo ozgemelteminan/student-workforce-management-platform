@@ -44,6 +44,7 @@ public sealed class ApplicationCompletionTests
         Assert.DoesNotContain("raw-invite-token", invitation.TokenHash);
         Assert.Equal("raw-invite-token", email.LastMessage?.SecretTemplateData?["invitationToken"]);
         Assert.False(email.LastMessage?.TemplateData.ContainsKey("invitationToken"));
+        Assert.Equal("\"ada@example.com\"", (await context.AuditLogs.SingleAsync()).NewValue);
 
         await handler.Handle(new AcceptInvitationCommand("raw-invite-token", "Password1", "Ada Lovelace", "Ada", "Lovelace", "Computer Engineering"), CancellationToken.None);
         await context.SaveChangesAsync();

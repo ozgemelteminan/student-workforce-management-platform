@@ -160,6 +160,42 @@ public sealed class LiveApiClosureTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Previously_unmapped_cqrs_routes_are_reachable_over_http()
+    {
+        await using var factory = await TestApiFactory.CreateInitializedAsync();
+
+        using var student = factory.CreateAuthenticatedClient(factory.Seed.StudentUserId, factory.Seed.StudentSessionId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await student.PostAsJsonAsync($"/api/v1/tasks/{factory.Seed.OtherStudentTaskId:D}/feedback", new { studentId = factory.Seed.OtherStudentId, rating = 5, comment = "Good work" })).StatusCode);
+
+        using var manager = factory.CreateAuthenticatedClient(factory.Seed.TaskManagerUserId, factory.Seed.TaskManagerSessionId);
+        var feedbackCreate = await manager.PostAsJsonAsync($"/api/v1/tasks/{factory.Seed.OtherStudentTaskId:D}/feedback", new { studentId = factory.Seed.OtherStudentId, rating = 5, comment = "Good work" });
+        Assert.Equal(HttpStatusCode.Created, feedbackCreate.StatusCode);
+        var feedback = await ReadJsonAsync(feedbackCreate);
+        var feedbackId = feedback.RootElement.GetProperty("id").GetGuid();
+
+        Assert.Contains(feedbackId.ToString("D"), await (await manager.GetAsync($"/api/v1/tasks/{factory.Seed.OtherStudentTaskId:D}/feedback")).Content.ReadAsStringAsync());
+
+        using var otherStudent = factory.CreateAuthenticatedClient(factory.Seed.OtherStudentUserId, factory.Seed.OtherStudentSessionId);
+        Assert.Contains(feedbackId.ToString("D"), await (await otherStudent.GetAsync($"/api/v1/students/{factory.Seed.OtherStudentId:D}/feedback")).Content.ReadAsStringAsync());
+
+        var templateCreate = await manager.PostAsJsonAsync("/api/v1/templates", new
+        {
+            title = "Template task",
+            description = "Created from template",
+            categoryId = factory.Seed.CategoryId,
+            defaultPriority = "MEDIUM",
+            defaultDifficulty = "EASY",
+            estimatedDurationMinutes = 45
+        });
+        Assert.Equal(HttpStatusCode.Created, templateCreate.StatusCode);
+        var templateId = (await ReadJsonAsync(templateCreate)).RootElement.GetProperty("id").GetGuid();
+
+        var taskCreate = await manager.PostAsJsonAsync($"/api/v1/templates/{templateId:D}/create-task", new { deadline = DateTimeOffset.UtcNow.AddDays(5) });
+        Assert.Equal(HttpStatusCode.Created, taskCreate.StatusCode);
+        Assert.Contains("Template task", await taskCreate.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ProblemDetails_and_rate_limiting_are_returned_by_runtime_pipeline()
     {
         await using var factory = await TestApiFactory.CreateInitializedAsync();
@@ -207,6 +243,9 @@ public sealed class LiveApiClosureTests
         var openApi = await anonymous.GetStringAsync("/openapi/v1.json");
         Assert.Contains("\"bearerAuth\"", openApi);
         Assert.Contains("\"/api/v1/tasks/{id}/start\"", openApi);
+        Assert.Contains("\"/api/v1/tasks/{taskId}/feedback\"", openApi);
+        Assert.Contains("\"/api/v1/students/{studentId}/feedback\"", openApi);
+        Assert.Contains("\"/api/v1/templates/{id}/create-task\"", openApi);
         Assert.Contains("IN_PROGRESS", openApi);
         using var openApiJson = JsonDocument.Parse(openApi);
         Assert.True(ContainsStringEnumValue(openApiJson.RootElement, "IN_PROGRESS"));
@@ -237,9 +276,191 @@ public sealed class LiveApiClosureTests
         Assert.True(cors.Headers.Contains("Access-Control-Allow-Credentials"));
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task Runtime_openapi_application_surface_is_executable_over_http()
+    {
+        await using var factory = await TestApiFactory.CreateInitializedAsync();
+        _currentExecutionSeed = factory.Seed;
+
+        using var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+        using var admin = factory.CreateAuthenticatedClient(factory.Seed.AdminUserId, factory.Seed.AdminSessionId);
+        using var manager = factory.CreateAuthenticatedClient(factory.Seed.TaskManagerUserId, factory.Seed.TaskManagerSessionId);
+        using var reviewer = factory.CreateAuthenticatedClient(factory.Seed.ReviewerUserId, factory.Seed.ReviewerSessionId);
+        using var student = factory.CreateAuthenticatedClient(factory.Seed.StudentUserId, factory.Seed.StudentSessionId);
+
+        using var openApi = JsonDocument.Parse(await anonymous.GetStringAsync("/openapi/v1.json"));
+        var operations = EnumerateApplicationOperations(openApi.RootElement);
+        Assert.Equal(139, operations.Count);
+
+        var results = new Dictionary<string, HttpStatusCode>(StringComparer.OrdinalIgnoreCase);
+        foreach (var operation in operations)
+        {
+            var client = ClientForOperation(operation, anonymous, admin, manager, reviewer, student);
+            var request = CreateOpenApiExecutionRequest(operation);
+            using var response = await client.SendAsync(request);
+            results[operation] = response.StatusCode;
+            var responseBody = await response.Content.ReadAsStringAsync();
+            Assert.False(IsUnexpectedExecutionFailure(response.StatusCode), $"{operation} returned unexpected {(int)response.StatusCode} {response.StatusCode}: {responseBody}");
+        }
+
+        Assert.Equal(operations.Count, results.Count);
+        Assert.Equal(139, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
+    }
+
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)
     {
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    private static IReadOnlyCollection<string> EnumerateApplicationOperations(JsonElement openApi)
+    {
+        var operations = new List<string>();
+        foreach (var path in openApi.GetProperty("paths").EnumerateObject())
+        {
+            if (!path.Name.StartsWith("/api/v1", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var method in path.Value.EnumerateObject())
+            {
+                if (method.Name is "get" or "post" or "put" or "delete")
+                {
+                    operations.Add($"{method.Name.ToUpperInvariant()} {path.Name}");
+                }
+            }
+        }
+
+        return operations.Order(StringComparer.Ordinal).ToArray();
+    }
+
+    private static HttpClient ClientForOperation(string operation, HttpClient anonymous, HttpClient admin, HttpClient manager, HttpClient reviewer, HttpClient student)
+    {
+        if (operation.Contains("/auth/", StringComparison.Ordinal) || operation.Contains("/invitations/accept", StringComparison.Ordinal))
+        {
+            return anonymous;
+        }
+
+        if (operation.Contains("/submissions/{id}/approve", StringComparison.Ordinal)
+            || operation.Contains("/submissions/{id}/revision-request", StringComparison.Ordinal))
+        {
+            return reviewer;
+        }
+
+        if (operation.Contains("/tasks/{id}/accept", StringComparison.Ordinal)
+            || operation.Contains("/tasks/{id}/start", StringComparison.Ordinal)
+            || operation.Contains("/tasks/{id}/submit", StringComparison.Ordinal)
+            || operation.Contains("/requests/extension", StringComparison.Ordinal)
+            || operation.Contains("/requests/reassignment", StringComparison.Ordinal)
+            || operation.Contains("/marketplace/listings/{id}/claims", StringComparison.Ordinal)
+            || operation.Contains("/marketplace/claims/{id}/cancel", StringComparison.Ordinal))
+        {
+            return student;
+        }
+
+        if (operation.Contains("/tasks", StringComparison.Ordinal)
+            || operation.Contains("/categories", StringComparison.Ordinal)
+            || operation.Contains("/skills", StringComparison.Ordinal)
+            || operation.Contains("/marketplace", StringComparison.Ordinal)
+            || operation.Contains("/templates", StringComparison.Ordinal)
+            || operation.Contains("/recurring-tasks", StringComparison.Ordinal)
+            || operation.Contains("/analytics", StringComparison.Ordinal)
+            || operation.Contains("/files", StringComparison.Ordinal)
+            || operation.Contains("/schedules", StringComparison.Ordinal)
+            || operation.Contains("/availability", StringComparison.Ordinal))
+        {
+            return manager;
+        }
+
+        return admin;
+    }
+
+    private HttpRequestMessage CreateOpenApiExecutionRequest(string operation)
+    {
+        var separator = operation.IndexOf(' ', StringComparison.Ordinal);
+        var method = new HttpMethod(operation[..separator]);
+        var path = MaterializePath(operation[(separator + 1)..]);
+        var request = new HttpRequestMessage(method, path);
+        var body = BodyForOperation(operation);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
+        return request;
+    }
+
+    private string MaterializePath(string path)
+    {
+        return path
+            .Replace("{id}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
+            .Replace("{taskId}", SeededTaskId.ToString("D"), StringComparison.Ordinal)
+            .Replace("{studentId}", SeededStudentId.ToString("D"), StringComparison.Ordinal)
+            .Replace("{sessionId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
+            .Replace("{commentId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
+            .Replace("{itemId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
+            .Replace("{versionId}", Guid.NewGuid().ToString("D"), StringComparison.Ordinal)
+            .Replace("{key}", "site.title", StringComparison.Ordinal);
+    }
+
+    private Guid SeededTaskId => _currentExecutionSeed?.OtherStudentTaskId ?? Guid.NewGuid();
+    private Guid SeededStudentId => _currentExecutionSeed?.StudentId ?? Guid.NewGuid();
+    private TestSeed? _currentExecutionSeed;
+
+    private object? BodyForOperation(string operation)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (operation == "POST /api/v1/auth/login") return new { email = "admin@example.edu", password = "Correct1!", deviceName = "swagger-audit" };
+        if (operation == "POST /api/v1/auth/refresh") return new { refreshToken = "not-a-real-refresh-token" };
+        if (operation == "POST /api/v1/auth/logout") return new { sessionId = Guid.NewGuid() };
+        if (operation == "POST /api/v1/auth/forgot-password") return new { email = "student@example.edu" };
+        if (operation == "POST /api/v1/auth/reset-password") return new { token = "not-a-real-reset-token", newPassword = "Correct2!" };
+        if (operation == "POST /api/v1/invitations/accept") return new { token = "not-a-real-invitation-token", password = "Correct2!", displayName = "Accepted Student", firstName = "Accepted", lastName = "Student", department = "Computer Science" };
+        if (operation == "POST /api/v1/invitations") return new { email = $"invite-{Guid.NewGuid():N}@example.edu", expiresAt = now.AddDays(7) };
+        if (operation.Contains("/resend", StringComparison.Ordinal)) return new { expiresAt = now.AddDays(7) };
+        if (operation == "POST /api/v1/skills") return new { name = $"Skill {Guid.NewGuid():N}", description = "Swagger audit skill" };
+        if (operation == "POST /api/v1/students/{studentId}/skills") return new { skillId = Guid.NewGuid(), level = "BEGINNER" };
+        if (operation == "POST /api/v1/categories") return new { name = $"Category {Guid.NewGuid():N}", description = "Swagger audit category" };
+        if (operation == "PUT /api/v1/students/{id}") return new { firstName = "Updated", lastName = "Student", email = "updated@example.edu", department = "Computer Science" };
+        if (operation == "POST /api/v1/tasks" || operation == "PUT /api/v1/tasks/{id}") return new { title = "Swagger audit task", description = "Generated by endpoint execution audit", categoryId = Guid.NewGuid(), semesterId = (Guid?)null, priority = "MEDIUM", difficulty = "EASY", startDate = (DateTimeOffset?)null, deadline = now.AddDays(7), estimatedDurationMinutes = 60, concurrencyToken = Guid.NewGuid() };
+        if (operation.Contains("/assign", StringComparison.Ordinal)) return new { studentId = SeededStudentId, reason = "Swagger audit assignment" };
+        if (operation.Contains("/reassign", StringComparison.Ordinal)) return new { newStudentId = SeededStudentId, reason = "Swagger audit reassignment" };
+        if (operation.Contains("/unassign", StringComparison.Ordinal) || operation.Contains("/cancel", StringComparison.Ordinal)) return new { reason = "Swagger audit reason" };
+        if (operation.Contains("/dependencies", StringComparison.Ordinal)) return new { dependsOnTaskId = Guid.NewGuid() };
+        if (operation.Contains("/comments", StringComparison.Ordinal) && operation.StartsWith("POST ", StringComparison.Ordinal)) return new { content = "Swagger audit comment", visibility = "STUDENT_VISIBLE" };
+        if (operation.Contains("/comments", StringComparison.Ordinal) && operation.StartsWith("PUT ", StringComparison.Ordinal)) return new { content = "Swagger audit updated comment" };
+        if (operation.Contains("/checklist", StringComparison.Ordinal) && operation.StartsWith("POST ", StringComparison.Ordinal)) return new { title = "Swagger audit checklist", order = 1 };
+        if (operation == "POST /api/v1/requests/extension") return new { taskId = SeededTaskId, requestedDeadline = now.AddDays(10), reason = "Swagger audit extension" };
+        if (operation == "POST /api/v1/requests/reassignment") return new { taskId = SeededTaskId, reason = "Swagger audit reassignment", suggestedStudentId = SeededStudentId };
+        if (operation.Contains("/requests/{id}/approve", StringComparison.Ordinal)) return new { reviewerComment = "Approved", newAssigneeId = SeededStudentId };
+        if (operation.Contains("/requests/{id}/reject", StringComparison.Ordinal)) return new { reviewerComment = "Rejected" };
+        if (operation == "POST /api/v1/tasks/{taskId}/submissions/uploads") return new { fileName = "submission.txt", fileSize = 10L, mimeType = "text/plain", fileExtension = ".txt", contentHash = "abc123" };
+        if (operation.Contains("/submissions/{id}/", StringComparison.Ordinal)) return new { reviewerComment = "Reviewed" };
+        if (operation.Contains("/marketplace/tasks", StringComparison.Ordinal)) return new { approvalMode = "MANUAL_APPROVAL", expiresAt = now.AddDays(5) };
+        if (operation.Contains("/marketplace/listings/{id}/claims", StringComparison.Ordinal)) return new { expiresAt = now.AddDays(2) };
+        if (operation == "POST /api/v1/semesters" || operation == "PUT /api/v1/semesters/{id}") return new { name = $"Semester {Guid.NewGuid():N}", startDate = DateOnly.FromDateTime(DateTime.UtcNow), endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(4)), status = "ARCHIVED" };
+        if (operation == "POST /api/v1/schedules" || operation == "PUT /api/v1/schedules/{id}") return new { studentId = SeededStudentId, semesterId = Guid.NewGuid(), courseName = "Swagger Audit", courseCode = "SWG101", dayOfWeek = "Monday", startTime = "09:00:00", endTime = "10:00:00", location = "Room 1" };
+        if (operation == "POST /api/v1/availability" || operation == "PUT /api/v1/availability/{id}") return new { studentId = SeededStudentId, semesterId = Guid.NewGuid(), dayOfWeek = "Tuesday", startTime = "11:00:00", endTime = "12:00:00", status = "AVAILABLE", reason = "Swagger audit" };
+        if (operation == "POST /api/v1/files/uploads") return new { folderId = (Guid?)null, fileName = "audit.docx", fileSize = 10L, mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileExtension = ".docx", contentHash = "abc123" };
+        if (operation == "POST /api/v1/files/folders") return new { parentFolderId = (Guid?)null, name = $"Folder {Guid.NewGuid():N}" };
+        if (operation == "PUT /api/v1/files/folders/{id}") return new { name = $"Folder {Guid.NewGuid():N}" };
+        if (operation == "POST /api/v1/announcements" || operation == "PUT /api/v1/announcements/{id}") return new { title = "Swagger audit announcement", content = "Announcement body", expiresAt = now.AddDays(3), isPinned = false };
+        if (operation == "PUT /api/v1/notifications/preferences") return new { preferenceType = "TaskAssigned", channel = "IN_APP", isEnabled = true };
+        if (operation == "POST /api/v1/tasks/{taskId}/feedback") return new { studentId = SeededStudentId, rating = 5, comment = "Swagger audit feedback" };
+        if (operation == "POST /api/v1/templates" || operation == "PUT /api/v1/templates/{id}") return new { title = "Swagger audit template", description = "Template body", categoryId = Guid.NewGuid(), defaultPriority = "MEDIUM", defaultDifficulty = "EASY", estimatedDurationMinutes = 60, checklistTemplateJson = (string?)null, requiredSkillsTemplateJson = (string?)null };
+        if (operation == "POST /api/v1/templates/{id}/create-task") return new { startDate = (DateTimeOffset?)null, deadline = now.AddDays(7), semesterId = (Guid?)null };
+        if (operation == "POST /api/v1/recurring-tasks" || operation == "PUT /api/v1/recurring-tasks/{id}") return new { templateId = Guid.NewGuid(), frequency = "WEEKLY", timeZoneId = "UTC", localRunTime = "09:00:00", nextRunAt = now.AddDays(7) };
+        if (operation == "PUT /api/v1/settings/{key}") return new { value = "Student Workforce Management", concurrencyToken = Guid.NewGuid() };
+        if (operation == "POST /api/v1/exports") return new { type = "PersonalData", format = "Csv", scopeId = (Guid?)null };
+        return null;
+    }
+
+    private static bool IsUnexpectedExecutionFailure(HttpStatusCode statusCode)
+    {
+        return (int)statusCode >= 500
+            || statusCode == HttpStatusCode.NotImplemented
+            || statusCode == HttpStatusCode.MethodNotAllowed
+            || statusCode == HttpStatusCode.UnsupportedMediaType;
     }
 
     private static async System.Threading.Tasks.Task AssertSafeProblemAsync(HttpResponseMessage response)
@@ -469,7 +690,7 @@ public sealed class LiveApiClosureTests
             dbContext.Sessions.AddRange(adminSession, managerSession, reviewerSession, studentSession, otherStudentSession, inactiveSession, revokedSession);
 
             await dbContext.SaveChangesAsync();
-            Seed = new TestSeed(admin.Id, adminSession.Id, manager.Id, managerSession.Id, reviewer.Id, reviewerSession.Id, studentUser.Id, studentSession.Id, otherStudentUser.Id, otherStudentSession.Id, inactive.Id, inactiveSession.Id, revokedSession.Id, student.Id, otherStudent.Id, otherTask.Id, submission.Id);
+            Seed = new TestSeed(admin.Id, adminSession.Id, manager.Id, managerSession.Id, reviewer.Id, reviewerSession.Id, studentUser.Id, studentSession.Id, otherStudentUser.Id, otherStudentSession.Id, inactive.Id, inactiveSession.Id, revokedSession.Id, student.Id, otherStudent.Id, otherTask.Id, submission.Id, category.Id);
         }
 
         private static User NewUser(string email, Role role, bool isActive = true)
@@ -510,7 +731,8 @@ public sealed class LiveApiClosureTests
         Guid StudentId,
         Guid OtherStudentId,
         Guid OtherStudentTaskId,
-        Guid ReviewableSubmissionId);
+        Guid ReviewableSubmissionId,
+        Guid CategoryId);
 
     private sealed class FakeExportJobScheduler : IExportJobScheduler
     {

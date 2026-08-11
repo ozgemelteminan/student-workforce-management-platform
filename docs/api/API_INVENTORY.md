@@ -4,8 +4,8 @@ All application endpoints use `/api/v1/...` unless a future breaking version is 
 
 ## Summary
 
-- Mapped application API endpoints: 135
-- Functional application API endpoints: 135
+- Mapped application API endpoints: 139
+- Functional application API endpoints: 139
 - Deferred functional API endpoints: 0
 - Implemented but undocumented endpoints: 0
 - Documented but missing endpoints: 0
@@ -161,11 +161,18 @@ All application endpoints use `/api/v1/...` unless a future breaking version is 
 - `POST /api/v1/notifications/read-all`
 - `PUT /api/v1/notifications/preferences`
 
+### Feedback
+
+- `GET /api/v1/tasks/{taskId}/feedback`
+- `POST /api/v1/tasks/{taskId}/feedback`
+- `GET /api/v1/students/{studentId}/feedback`
+
 ### Templates
 
 - `GET /api/v1/templates`
 - `POST /api/v1/templates`
 - `GET /api/v1/templates/{id}`
+- `POST /api/v1/templates/{id}/create-task`
 - `PUT /api/v1/templates/{id}`
 - `DELETE /api/v1/templates/{id}`
 

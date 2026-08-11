@@ -19,6 +19,12 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "Student Workforce Management API v1";
+        options.SwaggerEndpoint("/openapi/v1.json", "Student Workforce Management API v1");
+    });
 }
 else
 {

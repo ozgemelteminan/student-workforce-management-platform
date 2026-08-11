@@ -96,6 +96,7 @@ public static class V1Endpoints
         MapFiles(api);
         MapAnnouncements(api);
         MapNotifications(api);
+        MapFeedback(api);
         MapTemplates(api);
         MapAnalytics(api);
         MapSettings(api);
@@ -331,12 +332,24 @@ public static class V1Endpoints
         notifications.MapPut("/preferences", async (UpdateNotificationPreferenceCommand request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(request, cancellationToken)));
     }
 
+    private static void MapFeedback(RouteGroupBuilder api)
+    {
+        api.MapGet("/tasks/{taskId:guid}/feedback", async (Guid taskId, [AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetFeedbackQuery { TaskId = taskId, Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search }, cancellationToken))).RequireAuthorization().WithTags("Feedback");
+        api.MapPost("/tasks/{taskId:guid}/feedback", async (Guid taskId, CreateFeedbackRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Created($"/api/v1/tasks/{taskId:D}/feedback", await sender.Send(new CreateFeedbackCommand(taskId, request.StudentId, request.Rating, request.Comment), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT").WithTags("Feedback");
+        api.MapGet("/students/{studentId:guid}/feedback", async (Guid studentId, [AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetFeedbackQuery { StudentId = studentId, Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search }, cancellationToken))).RequireAuthorization().WithTags("Feedback");
+    }
+
     private static void MapTemplates(RouteGroupBuilder api)
     {
         var templates = api.MapGroup("/templates").RequireAuthorization("STAFF_TASK_MANAGEMENT").WithTags("Templates");
         templates.MapGet("/", async ([AsParameters] PageParams page, Guid? categoryId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskTemplatesQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search, CategoryId = categoryId }, cancellationToken)));
         templates.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskTemplateQuery(id), cancellationToken)));
         templates.MapPost("/", async (CreateTaskTemplateCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/templates", await sender.Send(request, cancellationToken)));
+        templates.MapPost("/{id:guid}/create-task", async (Guid id, CreateTaskFromTemplateRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Created("/api/v1/tasks", await sender.Send(new CreateTaskFromTemplateCommand(id, request.StartDate, request.Deadline, request.SemesterId), cancellationToken)));
         templates.MapPut("/{id:guid}", async (Guid id, TemplateRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateTaskTemplateCommand(id, request.Title, request.Description, request.CategoryId, request.DefaultPriority, request.DefaultDifficulty, request.EstimatedDurationMinutes, request.ChecklistTemplateJson, request.RequiredSkillsTemplateJson), cancellationToken)));
         templates.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteTaskTemplateCommand(id), cancellationToken); return Results.NoContent(); });
 
@@ -448,7 +461,9 @@ public static class V1Endpoints
     public sealed record DepartmentFileUploadRequest(Guid? FolderId, string FileName, long FileSize, string MimeType, string FileExtension, string? ContentHash);
     public sealed record RenameFolderRequest(string Name);
     public sealed record AnnouncementRequest(string Title, string Content, DateTimeOffset? ExpiresAt, bool IsPinned);
+    public sealed record CreateFeedbackRequest(Guid StudentId, int? Rating, string? Comment);
     public sealed record TemplateRequest(string Title, string? Description, Guid CategoryId, TaskPriority DefaultPriority, TaskDifficulty DefaultDifficulty, int EstimatedDurationMinutes, string? ChecklistTemplateJson, string? RequiredSkillsTemplateJson);
+    public sealed record CreateTaskFromTemplateRequest(DateTimeOffset? StartDate, DateTimeOffset Deadline, Guid? SemesterId);
     public sealed record RecurringTaskRequest(string Frequency, string TimeZoneId, TimeOnly? LocalRunTime, DateTimeOffset NextRunAt);
     public sealed record UpdateSettingRequest(string Value, Guid ConcurrencyToken);
 }

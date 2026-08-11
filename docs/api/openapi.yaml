@@ -263,6 +263,11 @@ paths:
     post: { tags: [Notifications], responses: { "200": { description: All notifications marked read } } }
   /notifications/preferences:
     put: { tags: [Notifications], responses: { "200": { description: Preference updated } } }
+  /tasks/{taskId}/feedback:
+    get: { tags: [Feedback], parameters: [ { $ref: "#/components/parameters/taskId" } ], responses: { "200": { description: Task feedback page } } }
+    post: { tags: [Feedback], parameters: [ { $ref: "#/components/parameters/taskId" } ], responses: { "201": { description: Feedback created } } }
+  /students/{studentId}/feedback:
+    get: { tags: [Feedback], parameters: [ { $ref: "#/components/parameters/studentId" } ], responses: { "200": { description: Student feedback page } } }
   /templates:
     get: { tags: [Templates], responses: { "200": { description: Task templates } } }
     post: { tags: [Templates], responses: { "201": { description: Template created } } }
@@ -270,6 +275,8 @@ paths:
     get: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Template detail } } }
     put: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "200": { description: Template updated } } }
     delete: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "204": { description: Template deleted } } }
+  /templates/{id}/create-task:
+    post: { tags: [Templates], parameters: [ { $ref: "#/components/parameters/id" } ], responses: { "201": { description: Task created from template } } }
   /recurring-tasks:
     get: { tags: [RecurringTasks], responses: { "200": { description: Recurring tasks } } }
     post: { tags: [RecurringTasks], responses: { "201": { description: Recurring task created } } }

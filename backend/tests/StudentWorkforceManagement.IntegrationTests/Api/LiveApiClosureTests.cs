@@ -148,6 +148,47 @@ public sealed class LiveApiClosureTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Student_skills_read_contract_is_authorized_safe_and_reflects_upsert()
+    {
+        await using var factory = await TestApiFactory.CreateInitializedAsync();
+
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/students/{factory.Seed.StudentId:D}/skills")).StatusCode);
+
+        using var student = factory.CreateAuthenticatedClient(factory.Seed.StudentUserId, factory.Seed.StudentSessionId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await student.GetAsync($"/api/v1/students/{factory.Seed.OtherStudentId:D}/skills")).StatusCode);
+
+        using var admin = factory.CreateAuthenticatedClient(factory.Seed.AdminUserId, factory.Seed.AdminSessionId);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"/api/v1/students/{Guid.NewGuid():D}/skills")).StatusCode);
+
+        var empty = await admin.GetAsync($"/api/v1/students/{factory.Seed.OtherStudentId:D}/skills");
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
+        using var emptyJson = await ReadJsonAsync(empty);
+        Assert.Equal(JsonValueKind.Array, emptyJson.RootElement.ValueKind);
+        Assert.Empty(emptyJson.RootElement.EnumerateArray());
+
+        var create = await student.PostAsJsonAsync($"/api/v1/students/{factory.Seed.StudentId:D}/skills", new { skillId = factory.Seed.SkillId, level = "BEGINNER" });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var firstRead = await student.GetAsync($"/api/v1/students/{factory.Seed.StudentId:D}/skills");
+        Assert.Equal(HttpStatusCode.OK, firstRead.StatusCode);
+        using var firstJson = await ReadJsonAsync(firstRead);
+        var firstSkill = Assert.Single(firstJson.RootElement.EnumerateArray());
+        Assert.Equal(factory.Seed.SkillId, firstSkill.GetProperty("skillId").GetGuid());
+        Assert.Equal("Data QA", firstSkill.GetProperty("name").GetString());
+        Assert.Equal("BEGINNER", firstSkill.GetProperty("level").GetString());
+        Assert.False(firstSkill.TryGetProperty("studentId", out _));
+        Assert.False(firstSkill.TryGetProperty("concurrencyToken", out _));
+
+        var update = await student.PostAsJsonAsync($"/api/v1/students/{factory.Seed.StudentId:D}/skills", new { skillId = factory.Seed.SkillId, level = "EXPERT" });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var secondRead = await student.GetAsync($"/api/v1/students/{factory.Seed.StudentId:D}/skills");
+        Assert.Equal(HttpStatusCode.OK, secondRead.StatusCode);
+        using var secondJson = await ReadJsonAsync(secondRead);
+        var updatedSkill = Assert.Single(secondJson.RootElement.EnumerateArray());
+        Assert.Equal("EXPERT", updatedSkill.GetProperty("level").GetString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Durable_export_lifecycle_blocks_idor_and_streams_completed_artifacts()
     {
         await using var factory = await TestApiFactory.CreateInitializedAsync();
@@ -340,7 +381,7 @@ public sealed class LiveApiClosureTests
 
         using var openApi = JsonDocument.Parse(await anonymous.GetStringAsync("/openapi/v1.json"));
         var operations = EnumerateApplicationOperations(openApi.RootElement);
-        Assert.Equal(152, operations.Count);
+        Assert.Equal(153, operations.Count);
 
         var results = new Dictionary<string, HttpStatusCode>(StringComparer.OrdinalIgnoreCase);
         foreach (var operation in operations)
@@ -354,7 +395,7 @@ public sealed class LiveApiClosureTests
         }
 
         Assert.Equal(operations.Count, results.Count);
-        Assert.Equal(152, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
+        Assert.Equal(153, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)

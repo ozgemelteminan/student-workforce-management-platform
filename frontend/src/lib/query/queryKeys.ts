@@ -23,6 +23,30 @@ export const queryKeys = {
     all: ['students'] as const,
     list: (filters: Record<string, unknown> = {}) => [...queryKeys.students.all, 'list', filters] as const,
     detail: (id: string) => [...queryKeys.students.all, 'detail', id] as const,
+    me: () => [...queryKeys.students.all, 'me'] as const,
+    feedback: (id: string, filters: Record<string, unknown> = {}) => [...queryKeys.students.detail(id), 'feedback', filters] as const,
+    skills: (id: string) => [...queryKeys.students.detail(id), 'skills'] as const,
+  },
+  semesters: {
+    all: ['semesters'] as const,
+    active: () => [...queryKeys.semesters.all, 'active'] as const,
+  },
+  schedules: {
+    all: ['schedules'] as const,
+    student: (studentId: string, semesterId?: string) => [...queryKeys.schedules.all, 'student', studentId, semesterId ?? 'all'] as const,
+  },
+  availability: {
+    all: ['availability'] as const,
+    student: (studentId: string, semesterId?: string) => [...queryKeys.availability.all, 'student', studentId, semesterId ?? 'all'] as const,
+  },
+  requests: {
+    all: ['requests'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.requests.all, 'list', filters] as const,
+  },
+  reviews: {
+    all: ['reviews'] as const,
+    queue: () => [...queryKeys.reviews.all, 'queue'] as const,
+    versions: (submissionId: string) => [...queryKeys.reviews.all, 'submission', submissionId, 'versions'] as const,
   },
   categories: {
     all: ['categories'] as const,

@@ -44,6 +44,8 @@ using StudentWorkforceManagement.Application.Semesters.Queries.GetSemesters;
 using StudentWorkforceManagement.Application.Settings.Commands.UpdateSetting;
 using StudentWorkforceManagement.Application.Settings.Queries.GetSettings;
 using StudentWorkforceManagement.Application.Skills.Commands;
+using StudentWorkforceManagement.Application.Skills.DTOs;
+using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
 using StudentWorkforceManagement.Application.Skills.Queries.GetSkills;
 using StudentWorkforceManagement.Application.Students.Commands;
 using StudentWorkforceManagement.Application.Students.Queries;
@@ -186,6 +188,11 @@ public static class V1Endpoints
     {
         api.MapGet("/skills", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSkillsQuery(), cancellationToken))).RequireAuthorization();
         api.MapPost("/skills", async (CreateSkillCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/skills", await sender.Send(request, cancellationToken))).RequireAuthorization("ADMIN");
+        api.MapGet("/students/{studentId:guid}/skills", async (Guid studentId, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetStudentSkillsQuery(studentId), cancellationToken)))
+            .RequireAuthorization()
+            .WithTags("Skills")
+            .Produces<IReadOnlyCollection<StudentSkillDetailDto>>(StatusCodes.Status200OK);
         api.MapPost("/students/{studentId:guid}/skills", async (Guid studentId, UpsertStudentSkillRequest request, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new UpsertStudentSkillCommand(studentId, request.SkillId, request.Level), cancellationToken))).RequireAuthorization();
 

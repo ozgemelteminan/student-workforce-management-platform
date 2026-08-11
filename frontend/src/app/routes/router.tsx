@@ -21,6 +21,11 @@ const TaskFormPage = lazy(() => import('../../pages/tasks/TaskFormPage').then((m
 const TaskDetailPage = lazy(() => import('../../pages/tasks/TaskDetailPage').then((module) => ({ default: module.TaskDetailPage })))
 const MarketplacePage = lazy(() => import('../../pages/marketplace/MarketplacePage').then((module) => ({ default: module.MarketplacePage })))
 const FocusModePage = lazy(() => import('../../pages/tasks/FocusModePage').then((module) => ({ default: module.FocusModePage })))
+const StudentsPage = lazy(() => import('../../pages/students/StudentsPage').then((module) => ({ default: module.StudentsPage })))
+const StudentDetailPage = lazy(() => import('../../pages/students/StudentDetailPage').then((module) => ({ default: module.StudentDetailPage })))
+const SchedulePage = lazy(() => import('../../pages/schedule/SchedulePage').then((module) => ({ default: module.SchedulePage })))
+const RequestsPage = lazy(() => import('../../pages/requests/RequestsPage').then((module) => ({ default: module.RequestsPage })))
+const ReviewsPage = lazy(() => import('../../pages/reviews/ReviewsPage').then((module) => ({ default: module.ReviewsPage })))
 
 const devRoutes = import.meta.env.DEV ? [{ path: '/__dev/ui', element: <UiShowcasePage /> }] : []
 const allRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER', 'REVIEWER', 'STUDENT']
@@ -50,10 +55,10 @@ export const router = createBrowserRouter([
           { path: '/tasks', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<TasksPage />) }, { path: 'new', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<TaskFormPage />) }] }, { path: ':taskId', element: lazyPage(<TaskDetailPage />) }, { path: ':taskId/edit', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<TaskFormPage />) }] }] },
           { path: '/focus', element: <RequireRole roles={['STUDENT']} />, children: [{ index: true, element: lazyPage(<FocusModePage />) }] },
           { path: '/marketplace', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<MarketplacePage />) }] },
-          roleRoute('/students', 'Students', staffRoles),
-          roleRoute('/schedule', 'Schedule', allRoles),
-          roleRoute('/requests', 'Requests', allRoles),
-          roleRoute('/reviews', 'Reviews', reviewRoles),
+          { path: '/students', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<StudentsPage />) }, { path: ':studentId', element: lazyPage(<StudentDetailPage />) }] },
+          { path: '/schedule', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<SchedulePage />) }] },
+          { path: '/requests', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<RequestsPage />) }] },
+          { path: '/reviews', element: <RequireRole roles={reviewRoles} />, children: [{ index: true, element: lazyPage(<ReviewsPage />) }] },
           roleRoute('/files', 'Files', allRoles),
           roleRoute('/announcements', 'Announcements', allRoles),
           roleRoute('/templates', 'Templates', staffRoles),

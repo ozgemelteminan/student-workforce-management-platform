@@ -7,6 +7,8 @@ using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
+using StudentWorkforceManagement.Application.Skills.Commands;
+using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
 using StudentWorkforceManagement.Application.Submissions.Commands.ReviewSubmission;
 using StudentWorkforceManagement.Application.Tasks.Commands.AddTaskDependency;
 using StudentWorkforceManagement.Application.Tasks.Commands.Checklist;
@@ -206,6 +208,57 @@ public sealed class ApplicationWorkflowTests
         Assert.Equal(SkillLevel.BEGINNER, added.MinimumLevel);
         Assert.Equal(SkillLevel.ADVANCED, updated.MinimumLevel);
         Assert.Empty(context.TaskRequiredSkills);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Student_skills_query_returns_names_levels_empty_and_missing_student_semantics()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var otherStudent = SeedStudent(context);
+        var first = new Skill { Id = Guid.NewGuid(), Name = "Research" };
+        var second = new Skill { Id = Guid.NewGuid(), Name = "Data QA" };
+        context.Skills.AddRange(first, second);
+        context.StudentSkills.AddRange(
+            new StudentSkill { Id = Guid.NewGuid(), StudentId = student.Id, SkillId = first.Id, Skill = first, Level = SkillLevel.ADVANCED },
+            new StudentSkill { Id = Guid.NewGuid(), StudentId = student.Id, SkillId = second.Id, Skill = second, Level = SkillLevel.INTERMEDIATE });
+        await context.SaveChangesAsync();
+
+        var handler = new GetStudentSkillsQueryHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN));
+        var skills = await handler.Handle(new GetStudentSkillsQuery(student.Id), CancellationToken.None);
+        var empty = await handler.Handle(new GetStudentSkillsQuery(otherStudent.Id), CancellationToken.None);
+
+        Assert.Equal(new[] { "Data QA", "Research" }, skills.Select(skill => skill.Name).ToArray());
+        Assert.Equal(SkillLevel.INTERMEDIATE, skills.First().Level);
+        Assert.Equal(second.Id, skills.First().SkillId);
+        Assert.Empty(empty);
+        await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetStudentSkillsQuery(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Student_skills_query_blocks_cross_student_reads_and_reflects_upsert_updates()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var otherStudent = SeedStudent(context);
+        var skill = new Skill { Id = Guid.NewGuid(), Name = "Data QA" };
+        context.Skills.Add(skill);
+        await context.SaveChangesAsync();
+
+        var studentUser = new FakeCurrentUser(Guid.NewGuid(), student.Id, UserRole.STUDENT);
+        var readHandler = new GetStudentSkillsQueryHandler(context, studentUser);
+        var writeHandler = new SkillCommandHandler(context, studentUser);
+
+        var created = await writeHandler.Handle(new UpsertStudentSkillCommand(student.Id, skill.Id, SkillLevel.BEGINNER), CancellationToken.None);
+        var firstRead = await readHandler.Handle(new GetStudentSkillsQuery(student.Id), CancellationToken.None);
+        var updated = await writeHandler.Handle(new UpsertStudentSkillCommand(student.Id, skill.Id, SkillLevel.EXPERT), CancellationToken.None);
+        var secondRead = await readHandler.Handle(new GetStudentSkillsQuery(student.Id), CancellationToken.None);
+
+        Assert.Equal(SkillLevel.BEGINNER, created.Level);
+        Assert.Equal(SkillLevel.BEGINNER, Assert.Single(firstRead).Level);
+        Assert.Equal(created.Id, updated.Id);
+        Assert.Equal(SkillLevel.EXPERT, Assert.Single(secondRead).Level);
+        await Assert.ThrowsAsync<ForbiddenException>(() => readHandler.Handle(new GetStudentSkillsQuery(otherStudent.Id), CancellationToken.None));
     }
 
     [Fact]

@@ -9,4 +9,7 @@ public sealed record AssignmentRecommendationDto(
     int WorkloadScore,
     int PreviousExperienceScore,
     int ActiveWorkloadMinutes,
+    int? WeeklyTargetMinutes,
+    int WorkedMinutes,
+    int ProjectedMinutes,
     IReadOnlyCollection<string> Reasons);

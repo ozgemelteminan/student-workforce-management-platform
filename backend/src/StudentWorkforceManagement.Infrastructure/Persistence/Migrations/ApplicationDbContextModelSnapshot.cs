@@ -756,6 +756,172 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("MarketplaceListings", (string)null);
                 });
 
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Meeting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Agenda")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConfirmedEndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ConfirmedStartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)");
+
+                    b.Property<DateTimeOffset>("ResponseDeadline")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ResponseDeadline");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("Meetings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Meetings_ConfirmedRange", "\"ConfirmedEndAt\" IS NULL OR \"ConfirmedStartAt\" IS NULL OR \"ConfirmedEndAt\" > \"ConfirmedStartAt\"");
+                        });
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MeetingActionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedStudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("MeetingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedStudentId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("MeetingId");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("MeetingActionItems", (string)null);
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MeetingParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AvailableRangesJson")
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)");
+
+                    b.Property<string>("CampusPresence")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MeetingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("MeetingId", "StudentId")
+                        .IsUnique();
+
+                    b.ToTable("MeetingParticipants", (string)null);
+                });
+
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1248,6 +1414,9 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("WeeklyTargetMinutes")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
@@ -1262,7 +1431,10 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Students", (string)null);
+                    b.ToTable("Students", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Students_WeeklyTargetMinutes", "\"WeeklyTargetMinutes\" IS NULL OR \"WeeklyTargetMinutes\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.StudentSkill", b =>
@@ -1517,6 +1689,9 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int?>("PlannedEffortMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Reason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1546,13 +1721,18 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.HasIndex("TaskId")
-                        .IsUnique()
-                        .HasFilter("\"IsActive\" = true");
+                    b.HasIndex("TaskId");
 
                     b.HasIndex("TaskId", "IsActive");
 
-                    b.ToTable("TaskAssignmentHistory", (string)null);
+                    b.HasIndex("TaskId", "StudentId")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" = true");
+
+                    b.ToTable("TaskAssignmentHistory", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TaskAssignmentHistory_PlannedEffortMinutes", "\"PlannedEffortMinutes\" IS NULL OR \"PlannedEffortMinutes\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskChecklistItem", b =>
@@ -1679,6 +1859,42 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_TaskDependencies_NoSelfDependency", "\"TaskId\" <> \"DependsOnTaskId\"");
                         });
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskNudge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientStudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SenderStudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("RecipientStudentId");
+
+                    b.HasIndex("SenderStudentId");
+
+                    b.HasIndex("TaskId", "SenderStudentId", "RecipientStudentId", "SentAt");
+
+                    b.ToTable("TaskNudges", (string)null);
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskRequest", b =>
@@ -1936,6 +2152,158 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.ToTable("TaskTemplates", null, t =>
                         {
                             t.HasCheckConstraint("CK_TaskTemplates_EstimatedDurationMinutes", "\"EstimatedDurationMinutes\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TemporaryUnavailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("EndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("StartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("StudentId", "StartAt", "EndAt");
+
+                    b.ToTable("TemporaryUnavailability", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TemporaryUnavailability_Range", "\"EndAt\" > \"StartAt\"");
+                        });
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TimesheetEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TimesheetWeekId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("WorkDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("TimesheetWeekId");
+
+                    b.ToTable("TimesheetEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TimesheetEntries_Minutes", "\"Minutes\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TimesheetWeek", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReviewerComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TargetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("WeekEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("WeekStartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("StudentId", "WeekStartDate")
+                        .IsUnique();
+
+                    b.ToTable("TimesheetWeeks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TimesheetWeeks_TargetMinutes", "\"TargetMinutes\" >= 0");
                         });
                 });
 
@@ -2227,6 +2595,61 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.Navigation("PublishedBy");
 
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Meeting", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MeetingActionItem", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "AssignedStudent")
+                        .WithMany("MeetingActionItems")
+                        .HasForeignKey("AssignedStudentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Meeting", "Meeting")
+                        .WithMany("ActionItems")
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Task", "Task")
+                        .WithMany("MeetingActionItems")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AssignedStudent");
+
+                    b.Navigation("Meeting");
+
+                    b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MeetingParticipant", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Meeting", "Meeting")
+                        .WithMany("Participants")
+                        .HasForeignKey("MeetingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "Student")
+                        .WithMany("MeetingParticipants")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Meeting");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Notification", b =>
@@ -2538,6 +2961,33 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.Navigation("Task");
                 });
 
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskNudge", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "RecipientStudent")
+                        .WithMany("ReceivedNudges")
+                        .HasForeignKey("RecipientStudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "SenderStudent")
+                        .WithMany("SentNudges")
+                        .HasForeignKey("SenderStudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Task", "Task")
+                        .WithMany("Nudges")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RecipientStudent");
+
+                    b.Navigation("SenderStudent");
+
+                    b.Navigation("Task");
+                });
+
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskRequest", b =>
                 {
                     b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "RequestedBy")
@@ -2655,6 +3105,54 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedBy");
                 });
 
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TemporaryUnavailability", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "Student")
+                        .WithMany("TemporaryUnavailability")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TimesheetEntry", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Task", "Task")
+                        .WithMany("TimesheetEntries")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.TimesheetWeek", "TimesheetWeek")
+                        .WithMany("Entries")
+                        .HasForeignKey("TimesheetWeekId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Task");
+
+                    b.Navigation("TimesheetWeek");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TimesheetWeek", b =>
+                {
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("StudentWorkforceManagement.Domain.Entities.Student", "Student")
+                        .WithMany("TimesheetWeeks")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReviewedByUser");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.User", b =>
                 {
                     b.HasOne("StudentWorkforceManagement.Domain.Entities.Role", "Role")
@@ -2683,6 +3181,13 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.MarketplaceListing", b =>
                 {
                     b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Meeting", b =>
+                {
+                    b.Navigation("ActionItems");
+
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.RecurringTask", b =>
@@ -2728,11 +3233,23 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
 
                     b.Navigation("MarketplaceClaims");
 
+                    b.Navigation("MeetingActionItems");
+
+                    b.Navigation("MeetingParticipants");
+
+                    b.Navigation("ReceivedNudges");
+
                     b.Navigation("Requests");
+
+                    b.Navigation("SentNudges");
 
                     b.Navigation("Skills");
 
                     b.Navigation("Submissions");
+
+                    b.Navigation("TemporaryUnavailability");
+
+                    b.Navigation("TimesheetWeeks");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.Task", b =>
@@ -2751,11 +3268,17 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
 
                     b.Navigation("MarketplaceListings");
 
+                    b.Navigation("MeetingActionItems");
+
+                    b.Navigation("Nudges");
+
                     b.Navigation("Requests");
 
                     b.Navigation("RequiredSkills");
 
                     b.Navigation("Submissions");
+
+                    b.Navigation("TimesheetEntries");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskSubmission", b =>
@@ -2768,6 +3291,11 @@ namespace StudentWorkforceManagement.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TaskTemplate", b =>
                 {
                     b.Navigation("RecurringTasks");
+                });
+
+            modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.TimesheetWeek", b =>
+                {
+                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("StudentWorkforceManagement.Domain.Entities.User", b =>

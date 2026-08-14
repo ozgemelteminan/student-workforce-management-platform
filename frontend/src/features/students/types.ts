@@ -9,6 +9,7 @@ export type Student = {
   lastName: string
   email: string
   department: string
+  weeklyTargetMinutes?: number | null
   isActive: boolean
   createdAt: string
   updatedAt?: string
@@ -38,6 +39,7 @@ export type UpdateStudentPayload = {
   lastName: string
   email: string
   department: string
+  weeklyTargetMinutes?: number | null
 }
 
 export type UpsertStudentSkillPayload = {

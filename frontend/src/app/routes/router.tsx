@@ -23,6 +23,8 @@ const FocusModePage = lazy(() => import('../../pages/tasks/FocusModePage').then(
 const StudentsPage = lazy(() => import('../../pages/students/StudentsPage').then((module) => ({ default: module.StudentsPage })))
 const StudentDetailPage = lazy(() => import('../../pages/students/StudentDetailPage').then((module) => ({ default: module.StudentDetailPage })))
 const SchedulePage = lazy(() => import('../../pages/schedule/SchedulePage').then((module) => ({ default: module.SchedulePage })))
+const WorkloadPage = lazy(() => import('../../pages/workload/WorkloadPage').then((module) => ({ default: module.WorkloadPage })))
+const MeetingsPage = lazy(() => import('../../pages/meetings/MeetingsPage').then((module) => ({ default: module.MeetingsPage })))
 const RequestsPage = lazy(() => import('../../pages/requests/RequestsPage').then((module) => ({ default: module.RequestsPage })))
 const ReviewsPage = lazy(() => import('../../pages/reviews/ReviewsPage').then((module) => ({ default: module.ReviewsPage })))
 const FilesPage = lazy(() => import('../../pages/files/FilesPage').then((module) => ({ default: module.FilesPage })))
@@ -58,6 +60,8 @@ export const router = createBrowserRouter([
           { path: '/marketplace', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<MarketplacePage />) }] },
           { path: '/students', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<StudentsPage />) }, { path: ':studentId', element: lazyPage(<StudentDetailPage />) }] },
           { path: '/schedule', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<SchedulePage />) }] },
+          { path: '/workload', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<WorkloadPage />) }] },
+          { path: '/meetings', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<MeetingsPage />) }] },
           { path: '/requests', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<RequestsPage />) }] },
           { path: '/reviews', element: <RequireRole roles={reviewRoles} />, children: [{ index: true, element: lazyPage(<ReviewsPage />) }] },
           { path: '/files', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<FilesPage />) }] },

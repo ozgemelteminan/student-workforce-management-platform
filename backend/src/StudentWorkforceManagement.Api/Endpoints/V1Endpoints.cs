@@ -16,6 +16,8 @@ using StudentWorkforceManagement.Application.Availability.Queries.GetAvailabilit
 using StudentWorkforceManagement.Application.Availability.Queries.GetCurrentSemesterAvailability;
 using StudentWorkforceManagement.Application.Categories.Commands.CreateCategory;
 using StudentWorkforceManagement.Application.Categories.Queries.GetCategories;
+using StudentWorkforceManagement.Application.Collaboration.Commands;
+using StudentWorkforceManagement.Application.Collaboration.Queries;
 using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Pagination;
 using StudentWorkforceManagement.Application.Common.Storage;
@@ -111,6 +113,7 @@ public static class V1Endpoints
         MapSettings(api);
         MapAudit(api);
         MapExports(api);
+        MapCollaboration(api);
     }
 
     private static void MapAuth(RouteGroupBuilder api)
@@ -211,7 +214,7 @@ public static class V1Endpoints
         students.MapGet("/me", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetCurrentStudentProfileQuery(), cancellationToken)));
         students.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetStudentQuery(id), cancellationToken)));
         students.MapPut("/{id:guid}", async (Guid id, UpdateStudentRequest request, ISender sender, CancellationToken cancellationToken) =>
-            Results.Ok(await sender.Send(new UpdateStudentProfileCommand(id, request.FirstName, request.LastName, request.Email, request.Department), cancellationToken)));
+            Results.Ok(await sender.Send(new UpdateStudentProfileCommand(id, request.FirstName, request.LastName, request.Email, request.Department, request.WeeklyTargetMinutes), cancellationToken)));
         students.MapPost("/{id:guid}/activate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ActivateStudentCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
         students.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new DeactivateStudentCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
     }
@@ -227,9 +230,11 @@ public static class V1Endpoints
         tasks.MapPost("/", async (CreateTaskCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/tasks", await sender.Send(request, cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         tasks.MapPut("/{id:guid}", async (Guid id, UpdateTaskRequest request, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new UpdateTaskCommand(id, request.Title, request.Description, request.CategoryId, request.SemesterId, request.Priority, request.Difficulty, request.StartDate, request.Deadline, request.EstimatedDurationMinutes, request.ConcurrencyToken), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        tasks.MapPost("/{id:guid}/assign", async (Guid id, AssignTaskRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new AssignTaskCommand(id, request.StudentId, request.Reason), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        tasks.MapPost("/{id:guid}/reassign", async (Guid id, ReassignTaskRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReassignTaskCommand(id, request.NewStudentId, request.Reason), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
-        tasks.MapPost("/{id:guid}/unassign", async (Guid id, ReasonRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UnassignTaskCommand(id, request.Reason), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPost("/{id:guid}/assign", async (Guid id, AssignTaskRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new AssignTaskCommand(id, request.StudentId, request.Reason, request.PlannedEffortMinutes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPost("/{id:guid}/reassign", async (Guid id, ReassignTaskRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReassignTaskCommand(id, request.NewStudentId, request.Reason, request.PlannedEffortMinutes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPost("/{id:guid}/unassign", async (Guid id, UnassignTaskRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UnassignTaskCommand(id, request.Reason, request.StudentId), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        tasks.MapPost("/{id:guid}/nudges", async (Guid id, SendNudgeRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created($"/api/v1/tasks/{id:D}/nudges", await sender.Send(new SendTaskNudgeCommand(id, request.RecipientStudentId), cancellationToken))).RequireAuthorization("STUDENT").WithTags("Collaboration");
+        tasks.MapGet("/{id:guid}/nudges/eligibility", async (Guid id, Guid recipientStudentId, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetTaskNudgeEligibilityQuery(id, recipientStudentId), cancellationToken))).RequireAuthorization("STUDENT").WithTags("Collaboration");
         tasks.MapPost("/{id:guid}/accept", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new AcceptTaskCommand(id), cancellationToken)));
         tasks.MapPost("/{id:guid}/start", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new StartTaskCommand(id), cancellationToken)));
         tasks.MapPost("/{id:guid}/submit", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new SubmitTaskCommand(id), cancellationToken)));
@@ -549,6 +554,57 @@ public static class V1Endpoints
         });
     }
 
+    private static void MapCollaboration(RouteGroupBuilder api)
+    {
+        var timesheets = api.MapGroup("/timesheets").RequireAuthorization().WithTags("Timesheets");
+        timesheets.MapGet("/current", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetCurrentTimesheetWeekQuery(), cancellationToken)));
+        timesheets.MapGet("/", async ([AsParameters] TimesheetQueryParams query, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetTimesheetWeeksQuery { Page = query.Page, PageSize = ClampPageSize(query.PageSize), StudentId = query.StudentId, Status = query.Status }, cancellationToken)));
+        timesheets.MapPost("/entries", async (TimesheetEntryRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new UpsertTimesheetEntryCommand(null, request.TaskId, request.WorkDate, request.Minutes, request.Note), cancellationToken)));
+        timesheets.MapPut("/entries/{entryId:guid}", async (Guid entryId, TimesheetEntryRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new UpsertTimesheetEntryCommand(entryId, request.TaskId, request.WorkDate, request.Minutes, request.Note), cancellationToken)));
+        timesheets.MapDelete("/entries/{entryId:guid}", async (Guid entryId, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new DeleteTimesheetEntryCommand(entryId), cancellationToken)));
+        timesheets.MapPost("/{id:guid}/submit", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new SubmitTimesheetWeekCommand(id), cancellationToken)));
+        timesheets.MapPost("/{id:guid}/review", async (Guid id, TimesheetReviewRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new ReviewTimesheetWeekCommand(id, request.Status, request.ReviewerComment), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+
+        var unavailability = api.MapGroup("/unavailability").RequireAuthorization().WithTags("Unavailability");
+        unavailability.MapGet("/", async (Guid? studentId, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetTemporaryUnavailabilityQuery { StudentId = studentId }, cancellationToken)));
+        unavailability.MapPost("/", async (TemporaryUnavailabilityRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Created("/api/v1/unavailability", await sender.Send(new CreateTemporaryUnavailabilityCommand(request.StartAt, request.EndAt, request.Category, request.Note), cancellationToken)));
+        unavailability.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+        {
+            await sender.Send(new DeleteTemporaryUnavailabilityCommand(id), cancellationToken);
+            return Results.NoContent();
+        });
+
+        var meetings = api.MapGroup("/meetings").RequireAuthorization().WithTags("Meetings");
+        meetings.MapGet("/", async ([AsParameters] MeetingQueryParams query, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetMeetingsQuery { Page = query.Page, PageSize = ClampPageSize(query.PageSize), Search = query.Search, Status = query.Status }, cancellationToken)));
+        meetings.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetMeetingQuery(id), cancellationToken)));
+        meetings.MapPost("/", async (CreateMeetingRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Created("/api/v1/meetings", await sender.Send(new CreateMeetingCommand(request.Title, request.Type, request.ResponseDeadline, request.ParticipantStudentIds, request.Location, request.Agenda), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPost("/{id:guid}/response", async (Guid id, MeetingResponseRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new RespondToMeetingCommand(id, request.CampusPresence, request.AvailableRangesJson, request.Note), cancellationToken)));
+        meetings.MapGet("/{id:guid}/slot-recommendations", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new GetMeetingSlotRecommendationsQuery(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmMeetingRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new ConfirmMeetingCommand(id, request.StartAt, request.EndAt, request.Location), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPut("/{id:guid}/notes", async (Guid id, MeetingNotesRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new UpdateMeetingNotesCommand(id, request.Agenda, request.Notes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPost("/{id:guid}/cancel", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new CancelMeetingCommand(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPost("/{id:guid}/action-items", async (Guid id, MeetingActionItemRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Ok(await sender.Send(new AddMeetingActionItemCommand(id, request.Title, request.AssignedStudentId), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        meetings.MapPost("/{meetingId:guid}/action-items/{actionItemId:guid}/create-task", async (Guid meetingId, Guid actionItemId, ActionItemTaskRequest request, ISender sender, CancellationToken cancellationToken) =>
+            Results.Created("/api/v1/tasks", await sender.Send(new ConvertMeetingActionItemToTaskCommand(meetingId, actionItemId, request.CategoryId, request.SemesterId, request.Priority, request.Difficulty, request.Deadline, request.EstimatedDurationMinutes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+    }
+
     private static int ClampPageSize(int pageSize) => Math.Clamp(pageSize, 1, MaxPageSize);
 
     private static string ClientIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -578,10 +634,12 @@ public static class V1Endpoints
     public sealed record InviteRequest(string Email, DateTimeOffset ExpiresAt);
     public sealed record ResendInvitationRequest(DateTimeOffset ExpiresAt);
     public sealed record UpsertStudentSkillRequest(Guid SkillId, SkillLevel Level);
-    public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, string Department);
+    public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, string Department, int? WeeklyTargetMinutes);
     public sealed record UpdateTaskRequest(string Title, string? Description, Guid CategoryId, Guid? SemesterId, TaskPriority Priority, TaskDifficulty Difficulty, DateTimeOffset? StartDate, DateTimeOffset Deadline, int EstimatedDurationMinutes, Guid ConcurrencyToken);
-    public sealed record AssignTaskRequest(Guid StudentId, string? Reason);
-    public sealed record ReassignTaskRequest(Guid NewStudentId, string Reason);
+    public sealed record AssignTaskRequest(Guid StudentId, string? Reason, int? PlannedEffortMinutes);
+    public sealed record ReassignTaskRequest(Guid NewStudentId, string Reason, int? PlannedEffortMinutes);
+    public sealed record UnassignTaskRequest(string Reason, Guid? StudentId);
+    public sealed record SendNudgeRequest(Guid RecipientStudentId);
     public sealed record ReasonRequest(string Reason);
     public sealed record AddDependencyRequest(Guid DependsOnTaskId);
     public sealed record RequiredSkillRequest(Guid SkillId, SkillLevel MinimumLevel);
@@ -609,4 +667,15 @@ public static class V1Endpoints
     public sealed record CreateTaskFromTemplateRequest(DateTimeOffset? StartDate, DateTimeOffset Deadline, Guid? SemesterId);
     public sealed record RecurringTaskRequest(string Frequency, string TimeZoneId, TimeOnly? LocalRunTime, DateTimeOffset NextRunAt);
     public sealed record UpdateSettingRequest(string Value, Guid ConcurrencyToken);
+    public sealed record TimesheetQueryParams(int Page = 1, int PageSize = 20, Guid? StudentId = null, TimesheetStatus? Status = null);
+    public sealed record TimesheetEntryRequest(Guid TaskId, DateOnly WorkDate, int Minutes, string? Note);
+    public sealed record TimesheetReviewRequest(TimesheetStatus Status, string? ReviewerComment);
+    public sealed record TemporaryUnavailabilityRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, string Category, string? Note);
+    public sealed record MeetingQueryParams(int Page = 1, int PageSize = 20, string? Search = null, MeetingStatus? Status = null);
+    public sealed record CreateMeetingRequest(string Title, MeetingType Type, DateTimeOffset ResponseDeadline, IReadOnlyCollection<Guid> ParticipantStudentIds, string? Location, string? Agenda);
+    public sealed record MeetingResponseRequest(CampusPresence CampusPresence, string AvailableRangesJson, string? Note);
+    public sealed record ConfirmMeetingRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, string? Location);
+    public sealed record MeetingNotesRequest(string? Agenda, string? Notes);
+    public sealed record MeetingActionItemRequest(string Title, Guid? AssignedStudentId);
+    public sealed record ActionItemTaskRequest(Guid CategoryId, Guid? SemesterId, TaskPriority Priority, TaskDifficulty Difficulty, DateTimeOffset Deadline, int EstimatedDurationMinutes);
 }

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { StudentSkillsList } from './StudentDetailPage'
+import { formatWeeklyTarget, StudentSkillsList } from './StudentDetailPage'
 
 describe('StudentSkillsList', () => {
   it('renders real skill names and levels', () => {
@@ -23,5 +23,13 @@ describe('StudentSkillsList', () => {
     expect(screen.getByLabelText('Loading student skills')).toBeInTheDocument()
     rerender(<StudentSkillsList skills={[]} isLoading={false} isError onRetry={retry} />)
     expect(screen.getByText('Could not load skills.')).toBeInTheDocument()
+  })
+})
+
+describe('formatWeeklyTarget', () => {
+  it('shows missing student weekly target as not configured', () => {
+    expect(formatWeeklyTarget(null)).toBe('Not configured')
+    expect(formatWeeklyTarget(undefined)).toBe('Not configured')
+    expect(formatWeeklyTarget(600)).toBe('10 hr')
   })
 })

@@ -90,6 +90,6 @@ public sealed class StudentQueryHandler(StudentWorkforceManagement.Application.C
 
     private static System.Linq.Expressions.Expression<Func<StudentWorkforceManagement.Domain.Entities.Student, StudentDto>> ToDtoExpression()
     {
-        return student => new StudentDto(student.Id, student.UserId, student.FirstName, student.LastName, student.Email, student.Department, student.IsActive, student.CreatedAt, student.UpdatedAt, student.ConcurrencyToken);
+        return student => new StudentDto(student.Id, student.UserId, student.FirstName, student.LastName, student.Email, student.Department, student.WeeklyTargetMinutes, student.IsActive, student.CreatedAt, student.UpdatedAt, student.ConcurrencyToken);
     }
 }

@@ -36,7 +36,7 @@ export function Sidebar({ user, collapsed, onCollapsedChange, onNavigate, showCo
         ) : null}
       </div>
 
-      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Primary navigation" className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <div className="space-y-5">
           {groups.map((group) => (
             <div key={group.label}>

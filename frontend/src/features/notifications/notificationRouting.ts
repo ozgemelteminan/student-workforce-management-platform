@@ -13,6 +13,10 @@ export function getNotificationRoute(notification: Notification): string | null 
       return `/students/${notification.relatedEntityId}`
     case 'announcement':
       return `/announcements/${notification.relatedEntityId}`
+    case 'meeting':
+      return '/meetings'
+    case 'timesheet':
+      return '/workload'
     default:
       return null
   }

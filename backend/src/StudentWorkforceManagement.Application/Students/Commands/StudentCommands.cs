@@ -9,7 +9,7 @@ using StudentWorkforceManagement.Domain.Enums;
 
 namespace StudentWorkforceManagement.Application.Students.Commands;
 
-public sealed record UpdateStudentProfileCommand(Guid StudentId, string FirstName, string LastName, string Email, string Department) : IRequest<StudentDto>, IAuthorizableRequest
+public sealed record UpdateStudentProfileCommand(Guid StudentId, string FirstName, string LastName, string Email, string Department, int? WeeklyTargetMinutes) : IRequest<StudentDto>, IAuthorizableRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AnyRole;
 }
@@ -33,6 +33,7 @@ public sealed class UpdateStudentProfileCommandValidator : AbstractValidator<Upd
         RuleFor(command => command.LastName).NotEmpty().MaximumLength(120);
         RuleFor(command => command.Email).NotEmpty().EmailAddress().MaximumLength(256);
         RuleFor(command => command.Department).NotEmpty().MaximumLength(160);
+        RuleFor(command => command.WeeklyTargetMinutes).GreaterThanOrEqualTo(0).When(command => command.WeeklyTargetMinutes.HasValue);
     }
 }
 
@@ -55,6 +56,10 @@ public sealed class StudentCommandHandler(IApplicationDbContext dbContext, ICurr
         student.LastName = request.LastName.Trim();
         student.Email = request.Email.Trim().ToLowerInvariant();
         student.Department = request.Department.Trim();
+        if (currentUser.IsInRole(UserRole.ADMIN))
+        {
+            student.WeeklyTargetMinutes = request.WeeklyTargetMinutes;
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToDto(student);
     }
@@ -81,6 +86,6 @@ public sealed class StudentCommandHandler(IApplicationDbContext dbContext, ICurr
 
     private static StudentDto ToDto(StudentWorkforceManagement.Domain.Entities.Student student)
     {
-        return new StudentDto(student.Id, student.UserId, student.FirstName, student.LastName, student.Email, student.Department, student.IsActive, student.CreatedAt, student.UpdatedAt, student.ConcurrencyToken);
+        return new StudentDto(student.Id, student.UserId, student.FirstName, student.LastName, student.Email, student.Department, student.WeeklyTargetMinutes, student.IsActive, student.CreatedAt, student.UpdatedAt, student.ConcurrencyToken);
     }
 }

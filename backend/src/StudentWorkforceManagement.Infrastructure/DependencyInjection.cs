@@ -26,6 +26,7 @@ using StudentWorkforceManagement.Infrastructure.BackgroundJobs.OverdueTasks;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.RecurringTasks;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.RetentionCleanup;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.SemesterRollover;
+using StudentWorkforceManagement.Infrastructure.BackgroundJobs.WeeklyTimesheets;
 using StudentWorkforceManagement.Infrastructure.Email;
 using StudentWorkforceManagement.Infrastructure.Email.Delivery;
 using StudentWorkforceManagement.Infrastructure.Email.Providers;
@@ -166,6 +167,7 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddScoped<MarketplaceClaimExpirationJob>();
         services.AddScoped<SemesterRolloverJob>();
+        services.AddScoped<WeeklyTimesheetReminderJob>();
 
         var redisConnection = configuration["REDIS_CONNECTION_STRING"] ?? configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();

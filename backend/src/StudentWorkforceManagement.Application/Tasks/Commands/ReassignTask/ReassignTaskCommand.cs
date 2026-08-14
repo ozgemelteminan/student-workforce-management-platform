@@ -47,7 +47,7 @@ using StudentWorkforceManagement.Domain.Enums;
 
 namespace StudentWorkforceManagement.Application.Tasks.Commands.ReassignTask;
 
-public sealed record ReassignTaskCommand(Guid TaskId, Guid NewStudentId, string Reason)
+public sealed record ReassignTaskCommand(Guid TaskId, Guid NewStudentId, string Reason, int? PlannedEffortMinutes = null)
     : IRequest<TaskDto>, IAuthorizableRequest, ITransactionalRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
@@ -60,6 +60,7 @@ public sealed class ReassignTaskCommandValidator : AbstractValidator<ReassignTas
         RuleFor(command => command.TaskId).NotEmpty();
         RuleFor(command => command.NewStudentId).NotEmpty();
         RuleFor(command => command.Reason).NotEmpty().MaximumLength(1000);
+        RuleFor(command => command.PlannedEffortMinutes).GreaterThanOrEqualTo(0).When(command => command.PlannedEffortMinutes.HasValue);
     }
 }
 
@@ -72,12 +73,18 @@ public sealed class ReassignTaskCommandHandler(IApplicationDbContext dbContext, 
             ?? throw new NotFoundException("Task", request.TaskId);
         var newStudent = await dbContext.Students.SingleOrDefaultAsync(entity => entity.Id == request.NewStudentId, cancellationToken)
             ?? throw new NotFoundException("Student", request.NewStudentId);
-        var current = await dbContext.TaskAssignmentHistory.SingleOrDefaultAsync(entity => entity.TaskId == request.TaskId && entity.IsActive, cancellationToken)
+        var currentAssignments = await dbContext.TaskAssignmentHistory.Where(entity => entity.TaskId == request.TaskId && entity.IsActive).ToListAsync(cancellationToken);
+        var current = currentAssignments.FirstOrDefault(entity => entity.StudentId == task.AssignedStudentId) ?? currentAssignments.FirstOrDefault()
             ?? throw new ConflictException("Task has no active assignment to reassign.");
 
         if (!newStudent.IsActive)
         {
             throw new ConflictException("Inactive students cannot receive tasks.");
+        }
+
+        if (await dbContext.TaskAssignmentHistory.AnyAsync(entity => entity.TaskId == request.TaskId && entity.StudentId == request.NewStudentId && entity.IsActive, cancellationToken))
+        {
+            throw new ConflictException("Student already has an active assignment to this task.");
         }
 
         var actorId = currentUser.RequireUserId();
@@ -97,6 +104,7 @@ public sealed class ReassignTaskCommandHandler(IApplicationDbContext dbContext, 
             Status = AssignmentStatus.ACTIVE,
             Mode = AssignmentMode.REASSIGNMENT,
             IsActive = true,
+            PlannedEffortMinutes = request.PlannedEffortMinutes,
             Reason = request.Reason
         });
 

@@ -29,11 +29,13 @@ import {
   getTaskFeedback,
   getTasks,
   getSubmissionVersionDownloadUrl,
+  getTaskNudgeEligibility,
   openSignedDownload,
   reassignTask,
   reorderChecklist,
   requestSubmissionRevision,
   setChecklistItem,
+  sendTaskNudge,
   transitionTask,
   unassignTask,
   updateChecklistItem,
@@ -74,6 +76,14 @@ export function useSubmissionVersions(taskId: string | undefined, submissionId: 
     queryKey: queryKeys.tasks.submissionVersions(taskId ?? 'missing', submissionId ?? 'missing'),
     queryFn: ({ signal }) => getSubmissionVersions(taskId ?? '', submissionId ?? '', signal),
     enabled: Boolean(taskId && submissionId),
+  })
+}
+
+export function useTaskNudgeEligibility(taskId: string | undefined, recipientStudentId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.tasks.nudgeEligibility(taskId ?? 'missing', recipientStudentId ?? 'missing'),
+    queryFn: ({ signal }) => getTaskNudgeEligibility(taskId ?? '', recipientStudentId ?? '', signal),
+    enabled: Boolean(taskId && recipientStudentId && enabled),
   })
 }
 
@@ -120,9 +130,10 @@ export function useTaskMutations(taskId?: string) {
       onSuccess: async (task) => invalidateTask(task.id),
     }),
     cancel: useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => cancelTask(id, reason), onSuccess: async (task) => invalidateTask(task.id) }),
-    assign: useMutation({ mutationFn: ({ id, studentId, reason }: { id: string; studentId: string; reason?: string }) => assignTask(id, studentId, reason), onSuccess: async (task) => invalidateTask(task.id) }),
-    reassign: useMutation({ mutationFn: ({ id, newStudentId, reason }: { id: string; newStudentId: string; reason: string }) => reassignTask(id, newStudentId, reason), onSuccess: async (task) => invalidateTask(task.id) }),
-    unassign: useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => unassignTask(id, reason), onSuccess: async (task) => invalidateTask(task.id) }),
+    assign: useMutation({ mutationFn: ({ id, studentId, reason, plannedEffortMinutes }: { id: string; studentId: string; reason?: string; plannedEffortMinutes?: number }) => assignTask(id, studentId, reason, plannedEffortMinutes), onSuccess: async (task) => invalidateTask(task.id) }),
+    reassign: useMutation({ mutationFn: ({ id, newStudentId, reason, plannedEffortMinutes }: { id: string; newStudentId: string; reason: string; plannedEffortMinutes?: number }) => reassignTask(id, newStudentId, reason, plannedEffortMinutes), onSuccess: async (task) => invalidateTask(task.id) }),
+    unassign: useMutation({ mutationFn: ({ id, reason, studentId }: { id: string; reason: string; studentId?: string }) => unassignTask(id, reason, studentId), onSuccess: async (task) => invalidateTask(task.id) }),
+    nudge: useMutation({ mutationFn: ({ id, recipientStudentId }: { id: string; recipientStudentId: string }) => sendTaskNudge(id, recipientStudentId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(variables.id) }) }),
     addChecklist: useMutation({ mutationFn: ({ id, title, order }: { id: string; title: string; order: number }) => addChecklistItem(id, title, order), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
     updateChecklist: useMutation({ mutationFn: ({ id, itemId, title }: { id: string; itemId: string; title: string }) => updateChecklistItem(id, itemId, title), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
     deleteChecklist: useMutation({ mutationFn: ({ id, itemId }: { id: string; itemId: string }) => deleteChecklistItem(id, itemId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),

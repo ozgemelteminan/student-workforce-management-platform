@@ -36,7 +36,7 @@ public sealed class PersistenceModelTests
         AssertHasUniqueIndex(context, typeof(Role), nameof(Role.Name));
         AssertHasUniqueIndex(context, typeof(Student), nameof(Student.Email));
         AssertHasUniqueIndex(context, typeof(StudentSkill), nameof(StudentSkill.StudentId), nameof(StudentSkill.SkillId));
-        AssertHasUniqueIndex(context, typeof(TaskAssignmentHistory), nameof(TaskAssignmentHistory.TaskId));
+        AssertHasUniqueIndex(context, typeof(TaskAssignmentHistory), nameof(TaskAssignmentHistory.TaskId), nameof(TaskAssignmentHistory.StudentId));
         AssertHasUniqueIndex(context, typeof(TaskRequiredSkill), nameof(TaskRequiredSkill.TaskId), nameof(TaskRequiredSkill.SkillId));
         AssertHasUniqueIndex(context, typeof(TaskDependency), nameof(TaskDependency.TaskId), nameof(TaskDependency.DependsOnTaskId));
         AssertHasUniqueIndex(context, typeof(TaskRequest), nameof(TaskRequest.TaskId), nameof(TaskRequest.Type));

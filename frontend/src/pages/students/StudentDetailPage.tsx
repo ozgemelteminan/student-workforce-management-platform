@@ -65,7 +65,7 @@ export function StudentDetailPage() {
         <Metric label="Active tasks" value={profile.data?.activeTaskCount} />
         <Metric label="Completed tasks" value={profile.data?.completedTaskCount} />
         <Metric label="Derived workload" value={profile.data ? formatDuration(profile.data.currentWorkloadMinutes) : undefined} />
-        <Metric label="Skill records" value={profile.data?.skillCount} />
+        <Metric label="Weekly target" value={student ? formatWeeklyTarget(student.weeklyTargetMinutes) : undefined} />
       </div>
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
@@ -107,7 +107,7 @@ export function StudentDetailPage() {
           )}
         </CardContent>
       </Card>
-      {student ? <EditStudentDialog student={student} open={editOpen} onOpenChange={setEditOpen} /> : null}
+      {student ? <EditStudentDialog student={student} isAdmin={isAdmin} open={editOpen} onOpenChange={setEditOpen} /> : null}
     </div>
   )
 }
@@ -166,12 +166,21 @@ function ActivationButton({ student }: { student: Student }) {
   )
 }
 
-function EditStudentDialog({ student, open, onOpenChange }: { student: Student; open: boolean; onOpenChange: (open: boolean) => void }) {
+function EditStudentDialog({ student, isAdmin, open, onOpenChange }: { student: Student; isAdmin: boolean; open: boolean; onOpenChange: (open: boolean) => void }) {
   const mutations = useStudentMutations(student.id)
-  const [form, setForm] = useState({ firstName: student.firstName, lastName: student.lastName, email: student.email, department: student.department })
+  const [form, setForm] = useState({ firstName: student.firstName, lastName: student.lastName, email: student.email, department: student.department, weeklyTargetMinutes: student.weeklyTargetMinutes?.toString() ?? '' })
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    mutations.update.mutate({ id: student.id, payload: form }, { onSuccess: () => onOpenChange(false) })
+    mutations.update.mutate({
+      id: student.id,
+      payload: {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        department: form.department,
+        weeklyTargetMinutes: isAdmin && form.weeklyTargetMinutes !== '' ? Number(form.weeklyTargetMinutes) : isAdmin ? null : undefined,
+      },
+    }, { onSuccess: () => onOpenChange(false) })
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,10 +191,15 @@ function EditStudentDialog({ student, open, onOpenChange }: { student: Student; 
           <FormField label="Last name" required>{({ id }) => <Input id={id} value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />}</FormField>
           <FormField label="Email" required>{({ id }) => <Input id={id} type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</FormField>
           <FormField label="Department" required>{({ id }) => <Input id={id} value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} />}</FormField>
+          {isAdmin ? <FormField label="Weekly target minutes" helperText="Leave empty to keep the weekly target not configured.">{({ id }) => <Input id={id} type="number" min={0} value={form.weeklyTargetMinutes} onChange={(event) => setForm({ ...form, weeklyTargetMinutes: event.target.value })} />}</FormField> : null}
           <FormField label="Notes" helperText="Profile notes are not part of the current write contract.">{({ id }) => <Textarea id={id} value="" disabled placeholder="Not available yet" />}</FormField>
           <DialogFooter><Button type="submit" isLoading={mutations.update.isPending}>Save changes</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   )
+}
+
+export function formatWeeklyTarget(value: number | null | undefined) {
+  return value === null || value === undefined ? 'Not configured' : formatDuration(value)
 }

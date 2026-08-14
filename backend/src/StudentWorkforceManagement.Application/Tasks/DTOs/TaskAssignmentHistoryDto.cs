@@ -12,4 +12,5 @@ public sealed record TaskAssignmentHistoryDto(
     AssignmentStatus Status,
     AssignmentMode Mode,
     bool IsActive,
+    int? PlannedEffortMinutes,
     string? Reason);

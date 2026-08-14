@@ -40,7 +40,7 @@ public sealed class GetTaskSubresourceQueryHandler(IApplicationDbContext dbConte
         return await dbContext.TaskAssignmentHistory.AsNoTracking()
             .Where(history => history.TaskId == request.TaskId)
             .OrderByDescending(history => history.AssignedAt)
-            .Select(history => new TaskAssignmentHistoryDto(history.Id, history.TaskId, history.StudentId, history.AssignedByUserId, history.AssignedAt, history.UnassignedAt, history.Status, history.Mode, history.IsActive, history.Reason))
+            .Select(history => new TaskAssignmentHistoryDto(history.Id, history.TaskId, history.StudentId, history.AssignedByUserId, history.AssignedAt, history.UnassignedAt, history.Status, history.Mode, history.IsActive, history.PlannedEffortMinutes, history.Reason))
             .ToListAsync(cancellationToken);
     }
 

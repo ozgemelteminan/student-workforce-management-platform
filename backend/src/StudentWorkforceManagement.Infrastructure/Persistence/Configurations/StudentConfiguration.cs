@@ -18,7 +18,12 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(entity => entity.LastName).HasMaxLength(100).IsRequired();
         builder.Property(entity => entity.Email).HasMaxLength(256).IsRequired();
         builder.Property(entity => entity.Department).HasMaxLength(200).IsRequired();
+        builder.Property(entity => entity.WeeklyTargetMinutes);
         builder.Property(entity => entity.IsActive).IsRequired();
+        builder.ToTable("Students", table =>
+        {
+            table.HasCheckConstraint("CK_Students_WeeklyTargetMinutes", "\"WeeklyTargetMinutes\" IS NULL OR \"WeeklyTargetMinutes\" >= 0");
+        });
         builder.HasIndex(entity => entity.Email).IsUnique();
         builder.HasIndex(entity => entity.IsActive);
     }

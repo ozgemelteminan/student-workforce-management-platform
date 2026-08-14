@@ -145,6 +145,7 @@ export type TaskAssignmentHistory = {
   status: AssignmentStatus
   mode: AssignmentMode
   isActive: boolean
+  plannedEffortMinutes?: number
   reason?: string
 }
 
@@ -157,6 +158,9 @@ export type AssignmentRecommendation = {
   workloadScore: number
   previousExperienceScore: number
   activeWorkloadMinutes: number
+  weeklyTargetMinutes?: number | null
+  workedMinutes: number
+  projectedMinutes: number
   reasons: string[]
 }
 

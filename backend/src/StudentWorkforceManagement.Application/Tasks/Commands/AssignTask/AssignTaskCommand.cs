@@ -48,7 +48,7 @@ using TaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
 namespace StudentWorkforceManagement.Application.Tasks.Commands.AssignTask;
 
-public sealed record AssignTaskCommand(Guid TaskId, Guid StudentId, string? Reason = null)
+public sealed record AssignTaskCommand(Guid TaskId, Guid StudentId, string? Reason = null, int? PlannedEffortMinutes = null)
     : IRequest<TaskDto>, IAuthorizableRequest, ITransactionalRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
@@ -61,6 +61,7 @@ public sealed class AssignTaskCommandValidator : AbstractValidator<AssignTaskCom
         RuleFor(command => command.TaskId).NotEmpty();
         RuleFor(command => command.StudentId).NotEmpty();
         RuleFor(command => command.Reason).MaximumLength(1000);
+        RuleFor(command => command.PlannedEffortMinutes).GreaterThanOrEqualTo(0).When(command => command.PlannedEffortMinutes.HasValue);
     }
 }
 
@@ -79,13 +80,13 @@ public sealed class AssignTaskCommandHandler(IApplicationDbContext dbContext, IC
             throw new ConflictException("Inactive students cannot receive tasks.");
         }
 
-        if (await dbContext.TaskAssignmentHistory.AnyAsync(entity => entity.TaskId == request.TaskId && entity.IsActive, cancellationToken))
+        if (await dbContext.TaskAssignmentHistory.AnyAsync(entity => entity.TaskId == request.TaskId && entity.StudentId == request.StudentId && entity.IsActive, cancellationToken))
         {
-            throw new ConflictException("Task already has an active assignment.");
+            throw new ConflictException("Student already has an active assignment to this task.");
         }
 
         var actorId = currentUser.RequireUserId();
-        task.AssignedStudentId = student.Id;
+        task.AssignedStudentId ??= student.Id;
         task.Status = TaskStatus.ASSIGNED;
         dbContext.TaskAssignmentHistory.Add(new TaskAssignmentHistory
         {
@@ -97,6 +98,7 @@ public sealed class AssignTaskCommandHandler(IApplicationDbContext dbContext, IC
             Status = AssignmentStatus.ACTIVE,
             Mode = AssignmentMode.MANUAL,
             IsActive = true,
+            PlannedEffortMinutes = request.PlannedEffortMinutes,
             Reason = request.Reason
         });
 

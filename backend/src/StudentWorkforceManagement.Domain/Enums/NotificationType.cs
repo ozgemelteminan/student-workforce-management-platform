@@ -10,4 +10,7 @@ public enum NotificationType
     COMMENT,
     ANNOUNCEMENT,
     REMINDER_SENT,
+    NUDGE,
+    TIMESHEET_REMINDER,
+    MEETING,
 }

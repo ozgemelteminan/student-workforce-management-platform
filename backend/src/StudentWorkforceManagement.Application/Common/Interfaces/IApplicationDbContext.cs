@@ -14,6 +14,13 @@ using Skill = StudentWorkforceManagement.Domain.Entities.Skill;
 using StudentSkill = StudentWorkforceManagement.Domain.Entities.StudentSkill;
 using SubmissionVersion = StudentWorkforceManagement.Domain.Entities.SubmissionVersion;
 using SystemSetting = StudentWorkforceManagement.Domain.Entities.SystemSetting;
+using Meeting = StudentWorkforceManagement.Domain.Entities.Meeting;
+using MeetingActionItem = StudentWorkforceManagement.Domain.Entities.MeetingActionItem;
+using MeetingParticipant = StudentWorkforceManagement.Domain.Entities.MeetingParticipant;
+using TemporaryUnavailability = StudentWorkforceManagement.Domain.Entities.TemporaryUnavailability;
+using TimesheetEntry = StudentWorkforceManagement.Domain.Entities.TimesheetEntry;
+using TimesheetWeek = StudentWorkforceManagement.Domain.Entities.TimesheetWeek;
+using TaskNudge = StudentWorkforceManagement.Domain.Entities.TaskNudge;
 using TaskAssignmentHistory = StudentWorkforceManagement.Domain.Entities.TaskAssignmentHistory;
 using TaskChecklistItem = StudentWorkforceManagement.Domain.Entities.TaskChecklistItem;
 using TaskComment = StudentWorkforceManagement.Domain.Entities.TaskComment;
@@ -80,6 +87,13 @@ public interface IApplicationDbContext
     DbSet<EmailDelivery> EmailDeliveries { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<SystemSetting> SystemSettings { get; }
+    DbSet<TimesheetWeek> TimesheetWeeks { get; }
+    DbSet<TimesheetEntry> TimesheetEntries { get; }
+    DbSet<TemporaryUnavailability> TemporaryUnavailability { get; }
+    DbSet<TaskNudge> TaskNudges { get; }
+    DbSet<Meeting> Meetings { get; }
+    DbSet<MeetingParticipant> MeetingParticipants { get; }
+    DbSet<MeetingActionItem> MeetingActionItems { get; }
 
     System.Threading.Tasks.Task<IApplicationTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
     System.Threading.Tasks.Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

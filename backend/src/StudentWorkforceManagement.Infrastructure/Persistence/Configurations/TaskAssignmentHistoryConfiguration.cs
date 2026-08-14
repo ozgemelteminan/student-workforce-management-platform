@@ -18,9 +18,13 @@ public sealed class TaskAssignmentHistoryConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => entity.StudentId);
         builder.HasIndex(entity => new { entity.TaskId, entity.IsActive });
-        builder.HasIndex(entity => entity.TaskId)
+        builder.HasIndex(entity => new { entity.TaskId, entity.StudentId })
             .IsUnique()
             .HasFilter("\"IsActive\" = true");
+        builder.ToTable("TaskAssignmentHistory", table =>
+        {
+            table.HasCheckConstraint("CK_TaskAssignmentHistory_PlannedEffortMinutes", "\"PlannedEffortMinutes\" IS NULL OR \"PlannedEffortMinutes\" >= 0");
+        });
         builder.HasOne(entity => entity.Task)
             .WithMany(task => task.AssignmentHistory)
             .HasForeignKey(entity => entity.TaskId)

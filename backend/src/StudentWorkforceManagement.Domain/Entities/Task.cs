@@ -37,4 +37,7 @@ public sealed class Task : AuditableEntity, ISoftDeletable, IHasConcurrencyToken
     public ICollection<TaskRequest> Requests { get; set; } = new List<TaskRequest>();
     public ICollection<MarketplaceListing> MarketplaceListings { get; set; } = new List<MarketplaceListing>();
     public ICollection<Feedback> Feedback { get; set; } = new List<Feedback>();
+    public ICollection<TaskNudge> Nudges { get; set; } = new List<TaskNudge>();
+    public ICollection<TimesheetEntry> TimesheetEntries { get; set; } = new List<TimesheetEntry>();
+    public ICollection<MeetingActionItem> MeetingActionItems { get; set; } = new List<MeetingActionItem>();
 }

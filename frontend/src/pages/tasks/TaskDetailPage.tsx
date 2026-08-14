@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Download, MessageSquarePlus, Paperclip, Play, Send, Trash2, UserPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp, BellRing, Download, MessageSquarePlus, Paperclip, Play, Send, Trash2, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, CardHeader, Checkbox, EmptyState, ErrorState, FormField, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '../../components/ui'
@@ -7,8 +7,9 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 import { appToast } from '../../lib/toast'
 import { ConflictMessage, TaskDeadline, TaskPriorityBadge, TaskStatusBadge, TaskSummary } from '../../features/tasks/components'
+import { useCurrentStudent } from '../../features/students/useStudentQueries'
 import { formatDuration } from '../../features/tasks/taskPresentation'
-import { useSubmissionVersions, useTask, useTaskCollections, useTaskLookups, useTaskMutations } from '../../features/tasks/useTaskQueries'
+import { useSubmissionVersions, useTask, useTaskCollections, useTaskLookups, useTaskMutations, useTaskNudgeEligibility } from '../../features/tasks/useTaskQueries'
 import type { Submission, Task, TaskCommentVisibility } from '../../features/tasks/types'
 
 const oneGb = 1024 * 1024 * 1024
@@ -22,6 +23,7 @@ export function TaskDetailPage() {
   const reviewer = roles.includes('ADMIN') || roles.includes('REVIEWER')
   const student = roles.includes('STUDENT')
   const task = useTask(taskId)
+  const currentStudent = useCurrentStudent(student)
   const collections = useTaskCollections(taskId, staff)
   const lookups = useTaskLookups()
   const mutations = useTaskMutations(taskId)
@@ -32,6 +34,7 @@ export function TaskDetailPage() {
   const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null)
   const [editingChecklistTitle, setEditingChecklistTitle] = useState('')
   const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [plannedEffortMinutes, setPlannedEffortMinutes] = useState<number | undefined>()
   const [reason, setReason] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -39,6 +42,8 @@ export function TaskDetailPage() {
   const [conflict, setConflict] = useState(false)
   const selectedSubmission = collections.submissions.data?.[0]
   const versions = useSubmissionVersions(taskId, selectedSubmission?.id)
+  const nudgeRecipientId = currentStudent.data && task.data?.assignedStudentId && task.data.assignedStudentId !== currentStudent.data.student.id ? task.data.assignedStudentId : undefined
+  const nudgeEligibility = useTaskNudgeEligibility(taskId, nudgeRecipientId, student && Boolean(currentStudent.data))
 
   const taskData = task.data
   const canTransition = useMemo(() => taskData ? visibleTransitions(taskData, roles) : [], [roles, taskData])
@@ -154,7 +159,7 @@ export function TaskDetailPage() {
               <Panel title="Assignment history" error={collections.history.isError} onRetry={() => void collections.history.refetch()}>
                 {!staff ? <EmptyState title="Assignment history is staff-only." /> : null}
                 {staff && collections.history.data?.length === 0 ? <EmptyState title="No assignment history." /> : null}
-                <div className="space-y-2">{collections.history.data?.map((item) => <div key={item.id} className="rounded-md border border-border px-3 py-2 text-sm"><p className="font-medium">{item.mode} · {item.status}</p><p className="text-text-secondary">{formatIstanbulDateTime(item.assignedAt)} · student {item.studentId.slice(0, 8)}</p>{item.reason ? <p className="mt-1 text-text-secondary">{item.reason}</p> : null}</div>)}</div>
+                <div className="space-y-2">{collections.history.data?.map((item) => <div key={item.id} className="rounded-md border border-border px-3 py-2 text-sm"><p className="font-medium">{item.mode} · {item.status}</p><p className="text-text-secondary">{formatIstanbulDateTime(item.assignedAt)} · student {item.studentId.slice(0, 8)}{item.plannedEffortMinutes ? ` · planned ${formatDuration(item.plannedEffortMinutes)}` : ''}</p>{item.reason ? <p className="mt-1 text-text-secondary">{item.reason}</p> : null}</div>)}</div>
               </Panel>
             </TabsContent>
             <TabsContent value="feedback">
@@ -168,8 +173,10 @@ export function TaskDetailPage() {
         <aside className="space-y-5">
           <Panel title="Assignment">
             <dl className="space-y-2 text-sm"><Row label="Assigned student" value={taskData.assignedStudentId ?? 'Not set'} /><Row label="Estimate" value={formatDuration(taskData.estimatedDurationMinutes)} /><Row label="Category" value={taskData.categoryId} /></dl>
-            {staff ? <form className="mt-3 space-y-2" onSubmit={(event) => { event.preventDefault(); if (selectedStudentId) void runMutation(() => (taskData.assignedStudentId ? mutations.reassign.mutateAsync({ id: taskData.id, newStudentId: selectedStudentId, reason: reason || 'Updated assignment' }) : mutations.assign.mutateAsync({ id: taskData.id, studentId: selectedStudentId, reason }))) }}><Select value={selectedStudentId} onValueChange={setSelectedStudentId}><SelectTrigger aria-label="Assign student"><SelectValue placeholder={lookups.students.isLoading ? 'Loading students' : 'Select student'} /></SelectTrigger><SelectContent>{lookups.students.data?.items.map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName}</SelectItem>)}</SelectContent></Select><Input aria-label="Assignment reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason" /><Button type="submit" className="w-full" isLoading={mutations.assign.isPending || mutations.reassign.isPending} iconBefore={<UserPlus className="h-4 w-4" />}>{taskData.assignedStudentId ? 'Reassign' : 'Assign'}</Button></form> : null}
+            {staff ? <form className="mt-3 space-y-2" onSubmit={(event) => { event.preventDefault(); if (selectedStudentId) void runMutation(() => (taskData.assignedStudentId ? mutations.reassign.mutateAsync({ id: taskData.id, newStudentId: selectedStudentId, reason: reason || 'Updated assignment', plannedEffortMinutes }) : mutations.assign.mutateAsync({ id: taskData.id, studentId: selectedStudentId, reason, plannedEffortMinutes }))) }}><Select value={selectedStudentId} onValueChange={setSelectedStudentId}><SelectTrigger aria-label="Assign student"><SelectValue placeholder={lookups.students.isLoading ? 'Loading students' : 'Select student'} /></SelectTrigger><SelectContent>{lookups.students.data?.items.map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName}</SelectItem>)}</SelectContent></Select><Input aria-label="Planned effort minutes" type="number" min={0} value={plannedEffortMinutes ?? ''} onChange={(event) => setPlannedEffortMinutes(event.target.value ? Number(event.target.value) : undefined)} placeholder="Planned effort minutes" /><Input aria-label="Assignment reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason" /><Button type="submit" className="w-full" isLoading={mutations.assign.isPending || mutations.reassign.isPending} iconBefore={<UserPlus className="h-4 w-4" />}>{taskData.assignedStudentId ? 'Reassign' : 'Assign'}</Button></form> : null}
           </Panel>
+          {student ? <Panel title="Team nudge" error={nudgeEligibility.isError} onRetry={() => void nudgeEligibility.refetch()}>
+            {nudgeRecipientId ? <div className="space-y-2 text-sm"><p className="text-text-secondary">Send a reminder to assigned teammate {nudgeRecipientId.slice(0, 8)}.</p>{nudgeEligibility.data?.nextAllowedAt ? <p className="text-xs text-text-muted">Next available {formatIstanbulDateTime(nudgeEligibility.data.nextAllowedAt)}</p> : null}<Button className="w-full" variant="outline" iconBefore={<BellRing className="h-4 w-4" />} disabled={!nudgeEligibility.data?.canSend} isLoading={mutations.nudge.isPending} onClick={() => mutations.nudge.mutate({ id: taskData.id, recipientStudentId: nudgeRecipientId })}>Send nudge</Button></div> : <EmptyState title="No teammate nudge target." description="Nudges are available when another assigned student is exposed by this task." />}</Panel> : null}
           <Panel title="Required skills" error={collections.skills.isError} onRetry={() => void collections.skills.refetch()}>
             {collections.skills.data?.length === 0 ? <EmptyState title="No required skills." /> : null}
             <div className="flex flex-wrap gap-2">{collections.skills.data?.map((skill) => <Badge key={skill.id} variant="neutral">{skill.skillName ?? skill.skillId.slice(0, 8)} · {skill.minimumLevel}</Badge>)}</div>
@@ -181,7 +188,7 @@ export function TaskDetailPage() {
           </Panel>
           <Panel title="Recommendations" error={collections.recommendations.isError} onRetry={() => void collections.recommendations.refetch()}>
             {!staff ? <EmptyState title="Recommendations are staff-only." /> : null}
-            <div className="space-y-2">{collections.recommendations.data?.slice(0, 5).map((item) => <div key={item.studentId} className="rounded-md border border-border px-3 py-2 text-sm"><p className="font-medium">{item.studentName} · {item.score}</p><p className="text-text-secondary">{item.reasons.join(', ') || 'No reasons returned.'}</p></div>)}</div>
+            <div className="space-y-2">{collections.recommendations.data?.slice(0, 5).map((item) => <div key={item.studentId} className="rounded-md border border-border px-3 py-2 text-sm"><p className="font-medium">{item.studentName} · {item.score}</p><p className="text-text-secondary">Worked {formatDuration(item.workedMinutes)} · projected {formatDuration(item.projectedMinutes)} · target {item.weeklyTargetMinutes ? formatDuration(item.weeklyTargetMinutes) : 'Not configured'}</p><p className="text-text-secondary">{item.reasons.join(', ') || 'No reasons returned.'}</p></div>)}</div>
           </Panel>
         </aside>
       </div>

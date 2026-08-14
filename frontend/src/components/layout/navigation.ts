@@ -2,9 +2,11 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  CalendarCheck,
   ClipboardCheck,
   ClipboardList,
   FileDown,
+  FileClock,
   FileText,
   FolderOpen,
   History,
@@ -13,6 +15,7 @@ import {
   Repeat,
   Settings,
   Store,
+  Timer,
   Users,
 } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
@@ -48,7 +51,9 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { label: 'Students', href: '/students', icon: Users, roles: staffRoles },
       { label: 'Schedule', href: '/schedule', icon: CalendarDays, roles: allRoles },
-      { label: 'Requests', href: '/requests', icon: ClipboardCheck, roles: allRoles },
+      { label: 'Workload', href: '/workload', icon: Timer, roles: allRoles },
+      { label: 'Meetings', href: '/meetings', icon: CalendarCheck, roles: allRoles },
+      { label: 'Requests', href: '/requests', icon: FileClock, roles: allRoles },
       { label: 'Reviews', href: '/reviews', icon: ClipboardCheck, roles: reviewRoles },
     ],
   },

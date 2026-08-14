@@ -5,15 +5,22 @@ using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Time;
+using StudentWorkforceManagement.Application.Collaboration.Commands;
+using StudentWorkforceManagement.Application.Collaboration.DTOs;
+using StudentWorkforceManagement.Application.Collaboration.Queries;
 using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
 using StudentWorkforceManagement.Application.Skills.Commands;
 using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
+using StudentWorkforceManagement.Application.Students.Commands;
 using StudentWorkforceManagement.Application.Submissions.Commands.ReviewSubmission;
+using StudentWorkforceManagement.Application.Tasks.Commands.AssignTask;
+using StudentWorkforceManagement.Application.Tasks.Commands.CreateTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.AddTaskDependency;
 using StudentWorkforceManagement.Application.Tasks.Commands.Checklist;
 using StudentWorkforceManagement.Application.Tasks.Commands.ReassignTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.RequiredSkills;
+using StudentWorkforceManagement.Application.Tasks.DTOs;
 using StudentWorkforceManagement.Application.Tasks.Queries.GetTasks;
 using StudentWorkforceManagement.Application.Tasks.Services;
 using StudentWorkforceManagement.Domain.Entities;
@@ -285,6 +292,162 @@ public sealed class ApplicationWorkflowTests
         Assert.Single(context.TaskChecklistItems.Where(item => item.TaskId == task.Id));
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task Collaborative_assignment_preserves_multiple_active_students_and_planned_effort()
+    {
+        await using var context = CreateContext();
+        var task = SeedTask(context, assignedStudentId: null);
+        var first = SeedStudent(context);
+        var second = SeedStudent(context);
+        var actorId = Guid.NewGuid();
+        await context.SaveChangesAsync();
+        var currentUser = new FakeCurrentUser(actorId, null, UserRole.TASK_MANAGER);
+        var handler = new AssignTaskCommandHandler(context, currentUser, new AuditService(context, currentUser), new NoOpEventQueue(), new FakeClock());
+
+        await handler.Handle(new AssignTaskCommand(task.Id, first.Id, "primary", 90), CancellationToken.None);
+        await handler.Handle(new AssignTaskCommand(task.Id, second.Id, "pair work", 45), CancellationToken.None);
+        await context.SaveChangesAsync();
+
+        var active = await context.TaskAssignmentHistory.Where(item => item.TaskId == task.Id && item.IsActive).OrderBy(item => item.AssignedAt).ToListAsync();
+        Assert.Equal(2, active.Count);
+        Assert.Equal(first.Id, task.AssignedStudentId);
+        Assert.Contains(active, item => item.StudentId == first.Id && item.PlannedEffortMinutes == 90);
+        Assert.Contains(active, item => item.StudentId == second.Id && item.PlannedEffortMinutes == 45);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Nudge_requires_co_assignees_and_enforces_cooldown()
+    {
+        await using var context = CreateContext();
+        var sender = SeedStudent(context);
+        var recipient = SeedStudent(context);
+        var task = SeedTask(context, assignedStudentId: sender.Id);
+        var now = new DateTimeOffset(2026, 8, 10, 9, 0, 0, TimeSpan.Zero);
+        context.TaskAssignmentHistory.AddRange(
+            new TaskAssignmentHistory { Id = Guid.NewGuid(), TaskId = task.Id, StudentId = sender.Id, AssignedByUserId = Guid.NewGuid(), AssignedAt = now, Status = AssignmentStatus.ACTIVE, Mode = AssignmentMode.MANUAL, IsActive = true },
+            new TaskAssignmentHistory { Id = Guid.NewGuid(), TaskId = task.Id, StudentId = recipient.Id, AssignedByUserId = Guid.NewGuid(), AssignedAt = now, Status = AssignmentStatus.ACTIVE, Mode = AssignmentMode.MANUAL, IsActive = true });
+        await context.SaveChangesAsync();
+        var currentUser = new FakeCurrentUser(sender.UserId, sender.Id, UserRole.STUDENT);
+        var commandHandler = CreateCollaborationCommandHandler(context, currentUser, new FakeClock(now));
+        var queryHandler = new CollaborationQueryHandler(context, currentUser, new FakeClock(now.AddMinutes(10)));
+
+        var sent = await commandHandler.Handle(new SendTaskNudgeCommand(task.Id, recipient.Id), CancellationToken.None);
+        var eligibility = await queryHandler.Handle(new GetTaskNudgeEligibilityQuery(task.Id, recipient.Id), CancellationToken.None);
+
+        Assert.Equal(now.AddHours(3), sent.NextAllowedAt);
+        Assert.False(eligibility.CanSend);
+        Assert.Equal(now.AddHours(3), eligibility.NextAllowedAt);
+        await Assert.ThrowsAsync<ConflictException>(() => commandHandler.Handle(new SendTaskNudgeCommand(task.Id, recipient.Id), CancellationToken.None));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Timesheet_entry_submit_review_and_query_use_persisted_values()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        student.WeeklyTargetMinutes = 480;
+        var task = SeedTask(context, assignedStudentId: student.Id);
+        context.TaskAssignmentHistory.Add(new TaskAssignmentHistory { Id = Guid.NewGuid(), TaskId = task.Id, StudentId = student.Id, AssignedByUserId = Guid.NewGuid(), AssignedAt = DateTimeOffset.UtcNow, Status = AssignmentStatus.ACTIVE, Mode = AssignmentMode.MANUAL, IsActive = true });
+        await context.SaveChangesAsync();
+        var studentUser = new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT);
+        var commandHandler = CreateCollaborationCommandHandler(context, studentUser);
+
+        var week = await commandHandler.Handle(new UpsertTimesheetEntryCommand(null, task.Id, new DateOnly(2026, 8, 10), 75, "handoff"), CancellationToken.None);
+        week = await commandHandler.Handle(new SubmitTimesheetWeekCommand(week.Id), CancellationToken.None);
+        var reviewHandler = CreateCollaborationCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER));
+        var reviewed = await reviewHandler.Handle(new ReviewTimesheetWeekCommand(week.Id, TimesheetStatus.APPROVED, null), CancellationToken.None);
+        var query = await new CollaborationQueryHandler(context, studentUser, new FakeClock()).Handle(new GetTimesheetWeeksQuery { Page = 1, PageSize = 10 }, CancellationToken.None);
+
+        Assert.Equal(TimesheetStatus.APPROVED, reviewed.Status);
+        Assert.Equal(480, reviewed.TargetMinutes);
+        Assert.Equal(75, reviewed.TotalMinutes);
+        Assert.Equal("handoff", Assert.Single(query.Items).Entries.Single().Note);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Admin_can_store_independent_weekly_targets_per_student()
+    {
+        await using var context = CreateContext();
+        var first = SeedStudent(context);
+        var second = SeedStudent(context);
+        var third = SeedStudent(context);
+        await context.SaveChangesAsync();
+        var handler = new StudentCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN));
+
+        await handler.Handle(new UpdateStudentProfileCommand(first.Id, first.FirstName, first.LastName, first.Email, first.Department, 600), CancellationToken.None);
+        await handler.Handle(new UpdateStudentProfileCommand(second.Id, second.FirstName, second.LastName, second.Email, second.Department, 480), CancellationToken.None);
+        await handler.Handle(new UpdateStudentProfileCommand(third.Id, third.FirstName, third.LastName, third.Email, third.Department, 720), CancellationToken.None);
+
+        Assert.Equal(600, await context.Students.Where(student => student.Id == first.Id).Select(student => student.WeeklyTargetMinutes).SingleAsync());
+        Assert.Equal(480, await context.Students.Where(student => student.Id == second.Id).Select(student => student.WeeklyTargetMinutes).SingleAsync());
+        Assert.Equal(720, await context.Students.Where(student => student.Id == third.Id).Select(student => student.WeeklyTargetMinutes).SingleAsync());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Timesheet_week_snapshots_student_target_and_keeps_history_when_student_changes()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        student.WeeklyTargetMinutes = 600;
+        var task = SeedTask(context, assignedStudentId: student.Id);
+        context.TaskAssignmentHistory.Add(new TaskAssignmentHistory { Id = Guid.NewGuid(), TaskId = task.Id, StudentId = student.Id, AssignedByUserId = Guid.NewGuid(), AssignedAt = DateTimeOffset.UtcNow, Status = AssignmentStatus.ACTIVE, Mode = AssignmentMode.MANUAL, IsActive = true });
+        await context.SaveChangesAsync();
+        var handler = CreateCollaborationCommandHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT));
+
+        var week = await handler.Handle(new UpsertTimesheetEntryCommand(null, task.Id, new DateOnly(2026, 8, 10), 30, null), CancellationToken.None);
+        student.WeeklyTargetMinutes = 720;
+        await context.SaveChangesAsync();
+        var queried = await new CollaborationQueryHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT), new FakeClock(new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero))).Handle(new GetTimesheetWeeksQuery { Page = 1, PageSize = 10 }, CancellationToken.None);
+
+        Assert.Equal(600, week.TargetMinutes);
+        Assert.Equal(600, Assert.Single(queried.Items).TargetMinutes);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Recommendations_use_each_student_target_and_mark_missing_target_as_not_configured()
+    {
+        await using var context = CreateContext();
+        var configured = SeedStudent(context);
+        configured.FirstName = "Configured";
+        configured.WeeklyTargetMinutes = 480;
+        var missing = SeedStudent(context);
+        missing.FirstName = "Missing";
+        missing.WeeklyTargetMinutes = null;
+        var task = SeedTask(context, minutes: 120);
+        await context.SaveChangesAsync();
+        var service = new AssignmentRecommendationService(context, new TaskWorkloadService(context), new SkillMatchingService());
+
+        var recommendations = await service.GetRecommendationsAsync(task.Id, CancellationToken.None);
+
+        var configuredResult = recommendations.Single(item => item.StudentId == configured.Id);
+        var missingResult = recommendations.Single(item => item.StudentId == missing.Id);
+        Assert.Equal(480, configuredResult.WeeklyTargetMinutes);
+        Assert.Null(missingResult.WeeklyTargetMinutes);
+        Assert.Contains("target-not-configured", missingResult.Reasons);
+        Assert.DoesNotContain(missingResult.Reasons, reason => reason.Contains("/ 0 min", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Meeting_slot_recommendations_prefer_overlapping_available_ranges()
+    {
+        await using var context = CreateContext();
+        var first = SeedStudent(context);
+        var second = SeedStudent(context);
+        await context.SaveChangesAsync();
+        var staff = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER);
+        var commandHandler = CreateCollaborationCommandHandler(context, staff);
+        var meeting = await commandHandler.Handle(new CreateMeetingCommand("Planning", MeetingType.IN_PERSON, DateTimeOffset.UtcNow.AddDays(1), new[] { first.Id, second.Id }, "Campus", null), CancellationToken.None);
+
+        await CreateCollaborationCommandHandler(context, new FakeCurrentUser(first.UserId, first.Id, UserRole.STUDENT)).Handle(new RespondToMeetingCommand(meeting.Id, CampusPresence.ON_CAMPUS, """[{"startAt":"2026-08-10T10:00:00Z","endAt":"2026-08-10T12:00:00Z"}]""", null), CancellationToken.None);
+        await CreateCollaborationCommandHandler(context, new FakeCurrentUser(second.UserId, second.Id, UserRole.STUDENT)).Handle(new RespondToMeetingCommand(meeting.Id, CampusPresence.OFF_CAMPUS, """[{"startAt":"2026-08-10T10:00:00Z","endAt":"2026-08-10T11:00:00Z"}]""", null), CancellationToken.None);
+        var slots = await new CollaborationQueryHandler(context, staff, new FakeClock()).Handle(new GetMeetingSlotRecommendationsQuery(meeting.Id), CancellationToken.None);
+
+        var best = Assert.Single(slots);
+        Assert.Equal(2, best.AvailableCount);
+        Assert.Equal(2, best.ParticipantCount);
+        Assert.Equal(new DateTimeOffset(2026, 8, 10, 10, 0, 0, TimeSpan.Zero), best.StartAt);
+    }
+
     private static ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -335,14 +498,29 @@ public sealed class ApplicationWorkflowTests
         public IReadOnlyCollection<UserRole> Roles { get; } = roles;
     }
 
-    private sealed class FakeClock : IUtcClock
+    private static CollaborationCommandHandler CreateCollaborationCommandHandler(ApplicationDbContext context, ICurrentUserService currentUser, IUtcClock? clock = null) =>
+        new(context, currentUser, new CapturingNotificationIntentService(), clock ?? new FakeClock(), new ThrowingCreateTaskHandler());
+
+    private sealed class FakeClock(DateTimeOffset? utcNow = null) : IUtcClock
     {
-        public DateTimeOffset UtcNow { get; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UtcNow { get; } = utcNow ?? DateTimeOffset.UtcNow;
     }
 
     private sealed class NoOpEventQueue : IApplicationEventQueue
     {
         public void Enqueue(INotification notification) { }
         public System.Threading.Tasks.Task PublishQueuedAsync(CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    private sealed class CapturingNotificationIntentService : INotificationIntentService
+    {
+        public System.Threading.Tasks.Task CreateAsync(Guid userId, NotificationType type, string title, string message, string? relatedEntityType, Guid? relatedEntityId, string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    private sealed class ThrowingCreateTaskHandler : IRequestHandler<CreateTaskCommand, TaskDto>
+    {
+        public System.Threading.Tasks.Task<TaskDto> Handle(CreateTaskCommand request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Action item conversion is covered by API integration tests.");
     }
 }

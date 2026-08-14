@@ -23,7 +23,7 @@ import type {
   UpdateTaskPayload,
 } from '../types'
 
-function params(filters: Record<string, string | number | undefined>) {
+function params(filters: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams()
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== '') search.set(key, String(value))
@@ -78,16 +78,24 @@ export function cancelTask(id: string, reason: string) {
   return apiRequest<Task>(`/tasks/${id}/cancel`, { method: 'POST', body: { reason } })
 }
 
-export function assignTask(id: string, studentId: string, reason?: string) {
-  return apiRequest<Task>(`/tasks/${id}/assign`, { method: 'POST', body: { studentId, reason } })
+export function assignTask(id: string, studentId: string, reason?: string, plannedEffortMinutes?: number) {
+  return apiRequest<Task>(`/tasks/${id}/assign`, { method: 'POST', body: { studentId, reason, plannedEffortMinutes } })
 }
 
-export function reassignTask(id: string, newStudentId: string, reason: string) {
-  return apiRequest<Task>(`/tasks/${id}/reassign`, { method: 'POST', body: { newStudentId, reason } })
+export function reassignTask(id: string, newStudentId: string, reason: string, plannedEffortMinutes?: number) {
+  return apiRequest<Task>(`/tasks/${id}/reassign`, { method: 'POST', body: { newStudentId, reason, plannedEffortMinutes } })
 }
 
-export function unassignTask(id: string, reason: string) {
-  return apiRequest<Task>(`/tasks/${id}/unassign`, { method: 'POST', body: { reason } })
+export function unassignTask(id: string, reason: string, studentId?: string) {
+  return apiRequest<Task>(`/tasks/${id}/unassign`, { method: 'POST', body: { reason, studentId } })
+}
+
+export function sendTaskNudge(id: string, recipientStudentId: string) {
+  return apiRequest(`/tasks/${id}/nudges`, { method: 'POST', body: { recipientStudentId } })
+}
+
+export function getTaskNudgeEligibility(id: string, recipientStudentId: string, signal?: AbortSignal) {
+  return apiRequest<{ canSend: boolean; nextAllowedAt?: string }>(`/tasks/${id}/nudges/eligibility${params({ recipientStudentId })}`, { signal })
 }
 
 export function getChecklist(taskId: string, signal?: AbortSignal) {

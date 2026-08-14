@@ -18,6 +18,7 @@ export const queryKeys = {
     history: (id: string) => [...queryKeys.tasks.detail(id), 'history'] as const,
     recommendations: (id: string) => [...queryKeys.tasks.detail(id), 'recommendations'] as const,
     feedback: (id: string, filters: Record<string, unknown> = {}) => [...queryKeys.tasks.detail(id), 'feedback', filters] as const,
+    nudgeEligibility: (id: string, recipientStudentId: string) => [...queryKeys.tasks.detail(id), 'nudge-eligibility', recipientStudentId] as const,
   },
   students: {
     all: ['students'] as const,
@@ -111,5 +112,20 @@ export const queryKeys = {
     all: ['exports'] as const,
     list: (filters: Record<string, unknown> = {}) => [...queryKeys.exports.all, 'list', filters] as const,
     detail: (id: string) => [...queryKeys.exports.all, 'detail', id] as const,
+  },
+  timesheets: {
+    all: ['timesheets'] as const,
+    current: () => [...queryKeys.timesheets.all, 'current'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.timesheets.all, 'list', filters] as const,
+  },
+  unavailability: {
+    all: ['unavailability'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.unavailability.all, 'list', filters] as const,
+  },
+  meetings: {
+    all: ['meetings'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.meetings.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.meetings.all, 'detail', id] as const,
+    slots: (id: string) => [...queryKeys.meetings.detail(id), 'slots'] as const,
   },
 } as const

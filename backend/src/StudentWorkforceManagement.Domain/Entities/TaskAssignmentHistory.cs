@@ -17,6 +17,7 @@ public sealed class TaskAssignmentHistory : AuditableEntity, IHasConcurrencyToke
     public AssignmentStatus Status { get; set; }
     public AssignmentMode Mode { get; set; }
     public bool IsActive { get; set; }
+    public int? PlannedEffortMinutes { get; set; }
     public string? Reason { get; set; }
     public Guid ConcurrencyToken { get; set; }
 }

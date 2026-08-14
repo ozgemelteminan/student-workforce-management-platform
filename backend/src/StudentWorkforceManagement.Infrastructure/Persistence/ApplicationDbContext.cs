@@ -46,6 +46,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<EmailDelivery> EmailDeliveries => Set<EmailDelivery>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<TimesheetWeek> TimesheetWeeks => Set<TimesheetWeek>();
+    public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
+    public DbSet<TemporaryUnavailability> TemporaryUnavailability => Set<TemporaryUnavailability>();
+    public DbSet<TaskNudge> TaskNudges => Set<TaskNudge>();
+    public DbSet<Meeting> Meetings => Set<Meeting>();
+    public DbSet<MeetingParticipant> MeetingParticipants => Set<MeetingParticipant>();
+    public DbSet<MeetingActionItem> MeetingActionItems => Set<MeetingActionItem>();
 
 
 

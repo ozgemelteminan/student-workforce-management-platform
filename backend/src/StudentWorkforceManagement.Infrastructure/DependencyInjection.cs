@@ -83,17 +83,37 @@ public static class DependencyInjection
         services.AddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
         services.AddScoped<IAccessTokenService, JwtAccessTokenService>();
 
+        var redisConnection = configuration["REDIS_CONNECTION_STRING"] ?? configuration.GetConnectionString("Redis");
+        if (!isDevelopment && string.IsNullOrWhiteSpace(redisConnection))
+        {
+            throw new InvalidOperationException("Production Redis connection string must be explicitly configured for Data Protection key persistence.");
+        }
+
+        Lazy<IConnectionMultiplexer>? redisMultiplexer = null;
+        if (string.IsNullOrWhiteSpace(redisConnection) == false)
+        {
+            redisMultiplexer = new Lazy<IConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(redisConnection));
+            services.AddSingleton(_ => redisMultiplexer.Value);
+        }
+
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
             .Validate(options => ValidateEmailOptions(options, isDevelopment), "Invalid email provider configuration.")
             .ValidateOnStart();
         var dataProtectionBuilder = services.AddDataProtection()
-            .SetApplicationName("StudentWorkforceManagement");
-        var dataProtectionKeysPath = configuration["DataProtection:KeysPath"];
-        if (string.IsNullOrWhiteSpace(dataProtectionKeysPath) == false)
+            .SetApplicationName("student-workforce-management");
+        if (!isDevelopment)
         {
-            dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+            dataProtectionBuilder.PersistKeysToStackExchangeRedis(redisMultiplexer!.Value, "StudentWorkforceManagement:DataProtectionKeys");
+        }
+        else
+        {
+            var dataProtectionKeysPath = configuration["DataProtection:KeysPath"];
+            if (string.IsNullOrWhiteSpace(dataProtectionKeysPath) == false)
+            {
+                dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+            }
         }
         services.AddSingleton<IEmailSecretProtector, DataProtectionEmailSecretProtector>();
         services.AddSingleton<EmailTemplateRenderer>();
@@ -177,12 +197,13 @@ public static class DependencyInjection
         services.AddScoped<SemesterRolloverJob>();
         services.AddScoped<WeeklyTimesheetReminderJob>();
 
-        var redisConnection = configuration["REDIS_CONNECTION_STRING"] ?? configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
-        if (string.IsNullOrWhiteSpace(redisConnection) == false)
+        if (redisMultiplexer is not null)
         {
-            services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
-            signalR.AddStackExchangeRedis(redisConnection);
+            signalR.AddStackExchangeRedis(options =>
+            {
+                options.ConnectionFactory = _ => System.Threading.Tasks.Task.FromResult(redisMultiplexer.Value);
+            });
         }
         services.AddScoped<INotificationRealtimeDispatcher, SignalRNotificationDispatcher>();
 

@@ -1,7 +1,10 @@
 using Hangfire;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using StackExchange.Redis;
 using StudentWorkforceManagement.Infrastructure;
@@ -67,5 +70,53 @@ public sealed class InfrastructureContainerTests
         await using var connection = await ConnectionMultiplexer.ConnectAsync(redis.GetConnectionString());
 
         Assert.True(connection.IsConnected);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_data_protection_persists_keys_to_shared_redis_multiplexer()
+    {
+        await using var redis = new RedisBuilder("redis:7-alpine")
+            .Build();
+        await redis.StartAsync();
+        var fileSystemKeyPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DATABASE_CONNECTION_STRING"] = "Host=localhost;Port=5432;Database=tests;Username=tests;Password=tests",
+                ["REDIS_CONNECTION_STRING"] = redis.GetConnectionString(),
+                ["Jwt:Issuer"] = "tests",
+                ["Jwt:Audience"] = "tests",
+                ["Jwt:SigningKey"] = "TEST_ONLY_SIGNING_KEY_0123456789_32_CHARS",
+                ["Email:Provider"] = "SMTP",
+                ["Email:Smtp:Host"] = "smtp.example.edu",
+                ["Storage:Provider"] = "S3",
+                ["Storage:S3:BucketName"] = "student-workforce",
+                ["Storage:S3:AccessKey"] = "access",
+                ["Storage:S3:SecretKey"] = "secret",
+                ["DataProtection:KeysPath"] = fileSystemKeyPath,
+                ["BackgroundJobs:EnableServer"] = "false"
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure(configuration, new FakeHostEnvironment("Production"));
+        await using var provider = services.BuildServiceProvider();
+        var multiplexer = provider.GetRequiredService<IConnectionMultiplexer>();
+        var protector = provider.GetRequiredService<IDataProtectionProvider>().CreateProtector("production-test");
+
+        var protectedValue = protector.Protect("payload");
+
+        Assert.Equal("payload", protector.Unprotect(protectedValue));
+        Assert.Same(multiplexer, provider.GetRequiredService<IConnectionMultiplexer>());
+        Assert.True(await multiplexer.GetDatabase().KeyExistsAsync("StudentWorkforceManagement:DataProtectionKeys"));
+        Assert.False(Directory.Exists(fileSystemKeyPath));
+    }
+
+    private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ApplicationName { get; set; } = "StudentWorkforceManagement.Tests";
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

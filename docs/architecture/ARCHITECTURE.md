@@ -16,7 +16,7 @@ Infrastructure implements mechanisms behind Application abstractions. Applicatio
 
 ## Data Protection
 
-`DataProtection:KeysPath` configures a persistent key-ring location. Docker Compose mounts a named volume at `/app/storage/keys` so queued email secrets survive container restarts. Production deployments must mount durable key storage and protect key material at rest using the hosting platform's secret/key-management controls.
+Production Data Protection keys are persisted to Redis through the shared `IConnectionMultiplexer` used by the SignalR backplane, under `StudentWorkforceManagement:DataProtectionKeys`. Development may use `DataProtection:KeysPath` for a local filesystem key ring.
 
 ## Retry Ownership
 

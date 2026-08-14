@@ -18,9 +18,10 @@ Set `ASPNETCORE_ENVIRONMENT=Production` and provide explicit values for:
 - `Storage__S3__BucketName`
 - `Storage__S3__AccessKey`
 - `Storage__S3__SecretKey`
-- `DataProtection__KeysPath` pointing to durable protected key storage
 
-Development-only email, local file storage, wildcard hosts, missing CORS origins, placeholder JWT keys, and implicit local database fallback are rejected in Production.
+Production Data Protection keys are persisted to Redis at `StudentWorkforceManagement:DataProtectionKeys` using the shared `REDIS_CONNECTION_STRING`; do not configure Production key persistence to `/app/storage/keys`.
+
+Development-only email, local file storage, wildcard hosts, missing CORS origins, placeholder JWT keys, implicit local database fallback, and missing Redis configuration are rejected in Production.
 
 ## Startup
 

@@ -27,6 +27,7 @@ using StudentWorkforceManagement.Infrastructure.Security.Tokens;
 using StudentWorkforceManagement.Infrastructure.Storage;
 using StudentWorkforceManagement.Infrastructure.Storage.Local;
 using StudentWorkforceManagement.Infrastructure.Storage.ObjectStorage;
+using Testcontainers.Redis;
 using DomainTask = StudentWorkforceManagement.Domain.Entities.Task;
 using DomainTaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
@@ -102,12 +103,41 @@ public sealed class InfrastructureProviderTests
     }
 
     [Fact]
-    public void Infrastructure_production_rejects_development_email_and_local_storage()
+    public void Infrastructure_production_requires_explicit_redis_connection()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DATABASE_CONNECTION_STRING"] = "Host=localhost;Port=5432;Database=tests;Username=tests;Password=tests",
+                ["Jwt:Issuer"] = "tests",
+                ["Jwt:Audience"] = "tests",
+                ["Jwt:SigningKey"] = "TEST_ONLY_SIGNING_KEY_0123456789_32_CHARS",
+                ["Email:Provider"] = "SMTP",
+                ["Email:Smtp:Host"] = "smtp.example.edu",
+                ["Storage:Provider"] = "S3",
+                ["Storage:S3:BucketName"] = "student-workforce",
+                ["Storage:S3:AccessKey"] = "access",
+                ["Storage:S3:SecretKey"] = "secret"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddInfrastructure(configuration, new FakeHostEnvironment("Production")));
+
+        Assert.Contains("Production Redis connection string", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Infrastructure_production_rejects_development_email_and_local_storage()
+    {
+        await using var redis = new RedisBuilder("redis:7-alpine")
+            .Build();
+        await redis.StartAsync();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DATABASE_CONNECTION_STRING"] = "Host=localhost;Port=5432;Database=tests;Username=tests;Password=tests",
+                ["REDIS_CONNECTION_STRING"] = redis.GetConnectionString(),
                 ["Jwt:Issuer"] = "tests",
                 ["Jwt:Audience"] = "tests",
                 ["Jwt:SigningKey"] = "TEST_ONLY_SIGNING_KEY_0123456789_32_CHARS",

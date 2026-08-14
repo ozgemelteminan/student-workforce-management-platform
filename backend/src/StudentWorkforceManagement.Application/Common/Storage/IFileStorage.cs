@@ -7,4 +7,5 @@ public interface IFileStorage
     System.Threading.Tasks.Task<StoredFileMetadata?> GetMetadataAsync(string storageKey, CancellationToken cancellationToken = default);
     System.Threading.Tasks.Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default);
     System.Threading.Tasks.Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default);
+    System.Threading.Tasks.Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default);
 }

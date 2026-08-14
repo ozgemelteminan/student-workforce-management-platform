@@ -216,6 +216,79 @@ public sealed class ApplicationCompletionTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Department_file_delete_removes_storage_object_and_soft_deletes_database_row()
+    {
+        await using var context = CreateContext();
+        var fileId = Guid.NewGuid();
+        var storageKey = "department-files/file.pdf";
+        var storage = new FakeFileStorage();
+        storage.Metadata[storageKey] = new StoredFileMetadata(storageKey, 4096, "application/pdf", "abc123");
+        context.DepartmentFiles.Add(new DepartmentFile
+        {
+            Id = fileId,
+            UploadedById = Guid.NewGuid(),
+            FileStatus = FileStatus.CONFIRMED,
+            ConfirmedAt = DateTimeOffset.UtcNow,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "file.pdf", StorageKey = storageKey, FileSize = 4096, MimeType = "application/pdf", FileExtension = ".pdf" }
+        });
+        await context.SaveChangesAsync();
+        var handler = new FileCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN), storage, CreateUploadPolicy(), new FakeClock(new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero)));
+
+        await handler.Handle(new DeleteDepartmentFileCommand(fileId), CancellationToken.None);
+        var deleted = await context.DepartmentFiles.IgnoreQueryFilters().SingleAsync(entity => entity.Id == fileId);
+
+        Assert.Equal([storageKey], storage.DeletedStorageKeys);
+        Assert.Equal(FileStatus.DELETED, deleted.FileStatus);
+        Assert.Equal(new DateTimeOffset(2026, 8, 14, 12, 0, 0, TimeSpan.Zero), deleted.DeletedAt);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Department_file_delete_treats_missing_storage_object_as_idempotent()
+    {
+        await using var context = CreateContext();
+        var fileId = Guid.NewGuid();
+        var storage = new FakeFileStorage();
+        context.DepartmentFiles.Add(new DepartmentFile
+        {
+            Id = fileId,
+            UploadedById = Guid.NewGuid(),
+            FileStatus = FileStatus.CONFIRMED,
+            ConfirmedAt = DateTimeOffset.UtcNow,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "missing.pdf", StorageKey = "department-files/missing.pdf", FileSize = 4096, MimeType = "application/pdf", FileExtension = ".pdf" }
+        });
+        await context.SaveChangesAsync();
+        var handler = new FileCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN), storage, CreateUploadPolicy(), new FakeClock());
+
+        await handler.Handle(new DeleteDepartmentFileCommand(fileId), CancellationToken.None);
+
+        Assert.Equal(FileStatus.DELETED, (await context.DepartmentFiles.IgnoreQueryFilters().SingleAsync(entity => entity.Id == fileId)).FileStatus);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Department_file_delete_does_not_soft_delete_when_storage_delete_fails_unexpectedly()
+    {
+        await using var context = CreateContext();
+        var fileId = Guid.NewGuid();
+        var storage = new FakeFileStorage { DeleteFailure = new InvalidOperationException("storage offline") };
+        context.DepartmentFiles.Add(new DepartmentFile
+        {
+            Id = fileId,
+            UploadedById = Guid.NewGuid(),
+            FileStatus = FileStatus.CONFIRMED,
+            ConfirmedAt = DateTimeOffset.UtcNow,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "file.pdf", StorageKey = "department-files/file.pdf", FileSize = 4096, MimeType = "application/pdf", FileExtension = ".pdf" }
+        });
+        await context.SaveChangesAsync();
+        var handler = new FileCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN), storage, CreateUploadPolicy(), new FakeClock());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(new DeleteDepartmentFileCommand(fileId), CancellationToken.None));
+        var file = await context.DepartmentFiles.SingleAsync(entity => entity.Id == fileId);
+
+        Assert.Equal(FileStatus.CONFIRMED, file.FileStatus);
+        Assert.Null(file.DeletedAt);
+    }
+
+    [Fact]
     public void Upload_policy_allows_required_user_file_types_and_blocks_executables()
     {
         var policy = CreateUploadPolicy();
@@ -413,6 +486,8 @@ public sealed class ApplicationCompletionTests
     private sealed class FakeFileStorage : IFileStorage
     {
         public Dictionary<string, StoredFileMetadata> Metadata { get; } = new(StringComparer.Ordinal);
+        public List<string> DeletedStorageKeys { get; } = [];
+        public Exception? DeleteFailure { get; init; }
         public System.Threading.Tasks.Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default)
         {
             var storageKey = $"{request.OwnershipScope}/{Guid.NewGuid():N}{request.FileExtension}";
@@ -428,5 +503,16 @@ public sealed class ApplicationCompletionTests
         public System.Threading.Tasks.Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.CompletedTask;
 
         public System.Threading.Tasks.Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default) => System.Threading.Tasks.Task.FromResult<Stream>(new MemoryStream());
+
+        public System.Threading.Tasks.Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
+        {
+            if (DeleteFailure is not null)
+            {
+                throw DeleteFailure;
+            }
+            DeletedStorageKeys.Add(storageKey);
+            Metadata.Remove(storageKey);
+            return System.Threading.Tasks.Task.CompletedTask;
+        }
     }
 }

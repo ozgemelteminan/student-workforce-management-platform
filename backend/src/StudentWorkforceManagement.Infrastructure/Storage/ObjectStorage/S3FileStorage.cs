@@ -7,7 +7,7 @@ using StudentWorkforceManagement.Application.Common.Storage;
 
 namespace StudentWorkforceManagement.Infrastructure.Storage.ObjectStorage;
 
-public sealed class S3FileStorage : IFileStorage
+public class S3FileStorage : IFileStorage
 {
     private readonly IAmazonS3 _client;
     private readonly StorageOptions _options;
@@ -94,5 +94,25 @@ public sealed class S3FileStorage : IFileStorage
             Key = storageKey
         }, cancellationToken);
         return response.ResponseStream;
+    }
+
+    public async Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await DeleteObjectAsync(new DeleteObjectRequest
+            {
+                BucketName = _options.S3.BucketName,
+                Key = storageKey
+            }, cancellationToken);
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.StatusCode == System.Net.HttpStatusCode.NoContent)
+        {
+        }
+    }
+
+    protected virtual Task<DeleteObjectResponse> DeleteObjectAsync(DeleteObjectRequest request, CancellationToken cancellationToken)
+    {
+        return _client.DeleteObjectAsync(request, cancellationToken);
     }
 }

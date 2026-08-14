@@ -1,3 +1,4 @@
+using Amazon.S3.Model;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ using StudentWorkforceManagement.Infrastructure.Security.Password;
 using StudentWorkforceManagement.Infrastructure.Security.Tokens;
 using StudentWorkforceManagement.Infrastructure.Storage;
 using StudentWorkforceManagement.Infrastructure.Storage.Local;
+using StudentWorkforceManagement.Infrastructure.Storage.ObjectStorage;
 using DomainTask = StudentWorkforceManagement.Domain.Entities.Task;
 using DomainTaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
@@ -166,6 +168,66 @@ public sealed class InfrastructureProviderTests
         Assert.Throws<InvalidOperationException>(() => storage.ResolvePath("../secret.txt"));
         Assert.Throws<InvalidOperationException>(() => storage.ResolvePath("/etc/passwd"));
         Assert.Throws<InvalidOperationException>(() => storage.ResolvePath("folder\\secret.txt"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Local_file_storage_delete_removes_file_and_is_idempotent_when_missing()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var storage = new LocalFileStorage(Options.Create(new StorageOptions { Provider = "Local", LocalRootPath = root, SignedUrlLifetimeMinutes = 15 }), DataProtectionProvider.Create(new DirectoryInfo(root)));
+        var storageKey = "department-files/delete-me.txt";
+        await storage.SaveAsync(storageKey, new MemoryStream(System.Text.Encoding.UTF8.GetBytes("content")), "text/plain");
+        var path = storage.ResolvePath(storageKey);
+
+        await storage.DeleteAsync(storageKey);
+        await storage.DeleteAsync(storageKey);
+
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task S3_file_storage_delete_invokes_delete_object_with_bucket_and_storage_key()
+    {
+        var storage = new CapturingS3FileStorage(Options.Create(new StorageOptions
+        {
+            Provider = "S3",
+            S3 = new S3StorageOptions
+            {
+                BucketName = "student-workforce-files",
+                Region = "us-east-1",
+                AccessKey = "access",
+                SecretKey = "secret"
+            }
+        }));
+
+        await storage.DeleteAsync("department-files/object.pdf");
+
+        Assert.NotNull(storage.LastDeleteRequest);
+        Assert.Equal("student-workforce-files", storage.LastDeleteRequest.BucketName);
+        Assert.Equal("department-files/object.pdf", storage.LastDeleteRequest.Key);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task S3_file_storage_delete_treats_not_found_as_idempotent()
+    {
+        var storage = new CapturingS3FileStorage(Options.Create(new StorageOptions
+        {
+            Provider = "S3",
+            S3 = new S3StorageOptions
+            {
+                BucketName = "student-workforce-files",
+                Region = "us-east-1",
+                AccessKey = "access",
+                SecretKey = "secret"
+            }
+        }))
+        {
+            DeleteException = new Amazon.S3.AmazonS3Exception("missing") { StatusCode = System.Net.HttpStatusCode.NotFound }
+        };
+
+        await storage.DeleteAsync("department-files/missing.pdf");
+
+        Assert.Equal("department-files/missing.pdf", storage.LastDeleteRequest?.Key);
     }
 
     [Fact]
@@ -409,6 +471,22 @@ public sealed class InfrastructureProviderTests
         public string ApplicationName { get; set; } = "StudentWorkforceManagement.Tests";
         public string ContentRootPath { get; set; } = Path.GetTempPath();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private sealed class CapturingS3FileStorage(IOptions<StorageOptions> options) : S3FileStorage(options)
+    {
+        public DeleteObjectRequest? LastDeleteRequest { get; private set; }
+        public Amazon.S3.AmazonS3Exception? DeleteException { get; init; }
+
+        protected override System.Threading.Tasks.Task<DeleteObjectResponse> DeleteObjectAsync(DeleteObjectRequest request, CancellationToken cancellationToken)
+        {
+            LastDeleteRequest = request;
+            if (DeleteException is not null)
+            {
+                throw DeleteException;
+            }
+            return System.Threading.Tasks.Task.FromResult(new DeleteObjectResponse());
+        }
     }
 
     private sealed class CapturingEmailProvider : IEmailProvider

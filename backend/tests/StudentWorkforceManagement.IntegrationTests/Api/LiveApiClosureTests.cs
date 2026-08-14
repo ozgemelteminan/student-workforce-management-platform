@@ -932,5 +932,12 @@ public sealed class LiveApiClosureTests
         {
             return Task.FromResult<Stream>(new MemoryStream(_content[storageKey], writable: false));
         }
+
+        public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
+        {
+            _content.Remove(storageKey);
+            Metadata.Remove(storageKey);
+            return Task.CompletedTask;
+        }
     }
 }

@@ -130,6 +130,7 @@ public sealed class FileCommandHandler(IApplicationDbContext dbContext, ICurrent
     {
         var file = await dbContext.DepartmentFiles.SingleOrDefaultAsync(entity => entity.Id == request.FileId, cancellationToken)
             ?? throw new NotFoundException("DepartmentFile", request.FileId);
+        await storage.DeleteAsync(file.File.StorageKey, cancellationToken);
         file.FileStatus = FileStatus.DELETED;
         file.DeletedAt = clock.UtcNow;
         await dbContext.SaveChangesAsync(cancellationToken);

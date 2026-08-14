@@ -3,26 +3,48 @@ services:
     build:
       context: .
       dockerfile: backend/src/StudentWorkforceManagement.Api/Dockerfile
+
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      DATABASE_CONNECTION_STRING: Host=postgres;Port=5432;Database=student_workforce;Username=student_workforce;Password=student_workforce_dev_password
-      REDIS_CONNECTION_STRING: redis:6379
-      DISPLAY_TIMEZONE: Europe/Istanbul
-      MAX_FILE_SIZE_BYTES: 1073741824
-      Jwt__Issuer: StudentWorkforceManagement
-      Jwt__Audience: StudentWorkforceManagement.Api
-      Jwt__SigningKey: DEV_ONLY_SIGNING_KEY_0123456789_32_CHARS_MIN
-      Email__Provider: Development
-      DataProtection__KeysPath: /app/storage/keys
-      Storage__Provider: Local
-      Storage__LocalRootPath: /app/storage/local
-      Storage__SignedUrlLifetimeMinutes: 15
-      BackgroundJobs__HangfireSchemaName: hangfire
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      DATABASE_CONNECTION_STRING: ${DATABASE_CONNECTION_STRING}
+      REDIS_CONNECTION_STRING: ${REDIS_CONNECTION_STRING}
+      FRONTEND_APP_URL: ${FRONTEND_APP_URL}
+      DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE}
+
+      Jwt__Issuer: ${Jwt__Issuer}
+      Jwt__Audience: ${Jwt__Audience}
+      Jwt__SigningKey: ${Jwt__SigningKey}
+
+      Email__Provider: ${Email__Provider}
+
+      DataProtection__KeysPath: ${DataProtection__KeysPath}
+
+      Storage__Provider: ${Storage__Provider}
+      Storage__SignedUrlLifetimeMinutes: ${Storage__SignedUrlLifetimeMinutes}
+      Storage__MaxFileSizeBytes: ${Storage__MaxFileSizeBytes}
+      Storage__StudentStorageQuotaBytes: ${Storage__StudentStorageQuotaBytes}
+      Storage__DepartmentStorageQuotaBytes: ${Storage__DepartmentStorageQuotaBytes}
+
+      Storage__S3__ServiceUrl: ${Storage__S3__ServiceUrl}
+      Storage__S3__BucketName: ${Storage__S3__BucketName}
+      Storage__S3__Region: ${Storage__S3__Region}
+      Storage__S3__AccessKey: ${Storage__S3__AccessKey}
+      Storage__S3__SecretKey: ${Storage__S3__SecretKey}
+      Storage__S3__ForcePathStyle: ${Storage__S3__ForcePathStyle}
+
+      BackgroundJobs__EnableServer: ${BackgroundJobs__EnableServer}
+      BackgroundJobs__HangfireSchemaName: ${BackgroundJobs__HangfireSchemaName}
+      BackgroundJobs__BatchSize: ${BackgroundJobs__BatchSize}
+      BackgroundJobs__JobRetryAttempts: ${BackgroundJobs__JobRetryAttempts}
+      BackgroundJobs__PendingUploadGraceMinutes: ${BackgroundJobs__PendingUploadGraceMinutes}
+
     ports:
       - "8080:8080"
+
     volumes:
       - api_local_storage:/app/storage/local
       - api_data_protection_keys:/app/storage/keys
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,34 +53,46 @@ services:
 
   postgres:
     image: postgres:16-alpine
+
     environment:
       POSTGRES_DB: student_workforce
       POSTGRES_USER: student_workforce
       POSTGRES_PASSWORD: student_workforce_dev_password
+
     ports:
       - "5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U student_workforce -d student_workforce"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U student_workforce -d student_workforce
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+
     ports:
       - "6379:6379"
+
     volumes:
       - redis_data:/data
+
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  postgres_data:
-  redis_data:
   api_local_storage:
   api_data_protection_keys:
+  postgres_data:
+  redis_data:

@@ -83,6 +83,13 @@ public sealed class LocalFileStorage(IOptions<StorageOptions> options, IDataProt
         return Task.FromResult(stream);
     }
 
+    public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        var path = ResolvePath(storageKey);
+        File.Delete(path);
+        return Task.CompletedTask;
+    }
+
     public string ResolvePath(string storageKey)
     {
         EnsureSafeStorageKey(storageKey);

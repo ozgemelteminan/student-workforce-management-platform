@@ -4,7 +4,6 @@ import { AppShell } from '../../components/layout/AppShell'
 import { Skeleton } from '../../components/ui'
 import { RequireAuth } from '../../features/auth/RequireAuth'
 import { RequireRole } from '../../features/auth/RequireRole'
-import { AppPlaceholderPage } from '../../pages/AppPlaceholderPage'
 import { AcceptInvitationPage } from '../../pages/auth/AcceptInvitationPage'
 import { ForgotPasswordPage } from '../../pages/auth/ForgotPasswordPage'
 import { LoginPage } from '../../pages/auth/LoginPage'
@@ -29,19 +28,18 @@ const ReviewsPage = lazy(() => import('../../pages/reviews/ReviewsPage').then((m
 const FilesPage = lazy(() => import('../../pages/files/FilesPage').then((module) => ({ default: module.FilesPage })))
 const AnnouncementsPage = lazy(() => import('../../pages/announcements/AnnouncementsPage').then((module) => ({ default: module.AnnouncementsPage })))
 const AnnouncementDetailPage = lazy(() => import('../../pages/announcements/AnnouncementDetailPage').then((module) => ({ default: module.AnnouncementDetailPage })))
+const NotificationsPage = lazy(() => import('../../pages/notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })))
+const TemplatesPage = lazy(() => import('../../pages/templates/TemplatesPage').then((module) => ({ default: module.TemplatesPage })))
+const RecurringTasksPage = lazy(() => import('../../pages/recurring-tasks/RecurringTasksPage').then((module) => ({ default: module.RecurringTasksPage })))
+const AnalyticsPage = lazy(() => import('../../pages/analytics/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })))
+const AuditLogsPage = lazy(() => import('../../pages/audit/AuditLogsPage').then((module) => ({ default: module.AuditLogsPage })))
+const SettingsPage = lazy(() => import('../../pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const ExportsPage = lazy(() => import('../../pages/exports/ExportsPage').then((module) => ({ default: module.ExportsPage })))
 
 const devRoutes = import.meta.env.DEV ? [{ path: '/__dev/ui', element: <UiShowcasePage /> }] : []
 const allRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER', 'REVIEWER', 'STUDENT']
 const staffRoles: UserRole[] = ['ADMIN', 'TASK_MANAGER']
 const reviewRoles: UserRole[] = ['ADMIN', 'REVIEWER']
-
-function roleRoute(path: string, title: string, roles: UserRole[]) {
-  return {
-    path,
-    element: <RequireRole roles={roles} />,
-    children: [{ index: true, element: <AppPlaceholderPage title={title} /> }],
-  }
-}
 
 function lazyPage(element: ReactNode) {
   return <Suspense fallback={<div className="space-y-3"><Skeleton className="h-8 w-56" /><Skeleton className="h-64" /></div>}>{element}</Suspense>
@@ -64,12 +62,13 @@ export const router = createBrowserRouter([
           { path: '/reviews', element: <RequireRole roles={reviewRoles} />, children: [{ index: true, element: lazyPage(<ReviewsPage />) }] },
           { path: '/files', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<FilesPage />) }] },
           { path: '/announcements', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<AnnouncementsPage />) }, { path: ':announcementId', element: lazyPage(<AnnouncementDetailPage />) }] },
-          roleRoute('/templates', 'Templates', staffRoles),
-          roleRoute('/recurring-tasks', 'Recurring Tasks', staffRoles),
-          roleRoute('/notifications', 'Notifications', allRoles),
-          roleRoute('/analytics', 'Analytics', staffRoles),
-          roleRoute('/audit-logs', 'Audit Logs', ['ADMIN']),
-          roleRoute('/settings', 'Settings', ['ADMIN']),
+          { path: '/templates', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<TemplatesPage />) }] },
+          { path: '/recurring-tasks', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<RecurringTasksPage />) }] },
+          { path: '/notifications', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<NotificationsPage />) }] },
+          { path: '/analytics', element: <RequireRole roles={staffRoles} />, children: [{ index: true, element: lazyPage(<AnalyticsPage />) }] },
+          { path: '/exports', element: <RequireRole roles={allRoles} />, children: [{ index: true, element: lazyPage(<ExportsPage />) }] },
+          { path: '/audit-logs', element: <RequireRole roles={['ADMIN']} />, children: [{ index: true, element: lazyPage(<AuditLogsPage />) }] },
+          { path: '/settings', element: <RequireRole roles={['ADMIN']} />, children: [{ index: true, element: lazyPage(<SettingsPage />) }] },
           { path: '/sessions', element: <SessionsPage /> },
           ...devRoutes,
           { path: '*', element: <NotFoundPage /> },

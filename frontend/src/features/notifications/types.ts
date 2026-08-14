@@ -32,3 +32,34 @@ export type NotificationFilters = {
 export type UnreadCountResponse = {
   count: number
 }
+
+export type NotificationPreferenceType =
+  | 'TaskAssigned'
+  | 'DeadlineReminder'
+  | 'Overdue'
+  | 'RequestResult'
+  | 'ReviewResult'
+  | 'Comment'
+  | 'Announcement'
+
+export type NotificationChannel = 'IN_APP' | 'EMAIL'
+
+export type NotificationPreferenceSetting = {
+  preferenceType: NotificationPreferenceType
+  channel: NotificationChannel
+  isEnabled: boolean
+}
+
+export type NotificationPreference = {
+  id: string
+  userId: string
+  preferenceType: NotificationPreferenceType
+  channel: NotificationChannel
+  isEnabled: boolean
+}
+
+export type UpdateNotificationPreferenceRequest = {
+  preferenceType: NotificationPreferenceType
+  channel: NotificationChannel
+  isEnabled: boolean
+}

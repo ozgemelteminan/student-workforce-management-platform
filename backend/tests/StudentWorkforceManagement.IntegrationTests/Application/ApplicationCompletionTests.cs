@@ -13,6 +13,8 @@ using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Files.Commands;
 using StudentWorkforceManagement.Application.Files.Services;
+using StudentWorkforceManagement.Application.Notifications.Commands;
+using StudentWorkforceManagement.Application.Notifications.Queries.GetNotificationPreferences;
 using StudentWorkforceManagement.Application.Students.Queries;
 using StudentWorkforceManagement.Application.Submissions.Commands.CompleteSubmissionUpload;
 using StudentWorkforceManagement.Application.Submissions.Queries.GetSubmission;
@@ -225,6 +227,33 @@ public sealed class ApplicationCompletionTests
 
         Assert.Throws<ConflictException>(() => policy.ValidatePendingUpload("installer.exe", 1024, "application/octet-stream", ".exe"));
         Assert.Throws<ConflictException>(() => policy.ValidatePendingUpload("report.pdf", 1024, "application/msword", ".pdf"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Notification_preferences_read_returns_persisted_rows_without_side_effects_and_reflects_put()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        var currentUser = new FakeCurrentUser(userId, null, UserRole.STUDENT);
+        var queryHandler = new GetNotificationPreferencesQueryHandler(context, currentUser);
+        var commandHandler = new NotificationCommandHandler(context, currentUser, new FakeClock());
+
+        var fresh = await queryHandler.Handle(new GetNotificationPreferencesQuery(), CancellationToken.None);
+
+        Assert.Empty(fresh);
+        Assert.Empty(context.NotificationPreferences);
+
+        await commandHandler.Handle(new UpdateNotificationPreferenceCommand(NotificationPreferenceType.TaskAssigned, NotificationChannel.EMAIL, false), CancellationToken.None);
+        await commandHandler.Handle(new UpdateNotificationPreferenceCommand(NotificationPreferenceType.Announcement, NotificationChannel.IN_APP, true), CancellationToken.None);
+
+        var updated = await queryHandler.Handle(new GetNotificationPreferencesQuery(), CancellationToken.None);
+        var emailTaskAssigned = updated.Single(preference => preference.PreferenceType == NotificationPreferenceType.TaskAssigned && preference.Channel == NotificationChannel.EMAIL);
+        var inAppAnnouncement = updated.Single(preference => preference.PreferenceType == NotificationPreferenceType.Announcement && preference.Channel == NotificationChannel.IN_APP);
+
+        Assert.Equal(2, updated.Count);
+        Assert.False(emailTaskAssigned.IsEnabled);
+        Assert.True(inAppAnnouncement.IsEnabled);
+        Assert.Equal(2, context.NotificationPreferences.Count());
     }
 
 

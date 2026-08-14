@@ -60,8 +60,12 @@ export const queryKeys = {
   },
   notifications: {
     all: ['notifications'] as const,
-    list: (filters: Record<string, unknown> = {}) => [...queryKeys.notifications.all, 'list', filters] as const,
-    unreadCount: () => [...queryKeys.notifications.all, 'unread-count'] as const,
+    list: (filters: Record<string, unknown> = {}) =>
+      [...queryKeys.notifications.all, 'list', filters] as const,
+    unreadCount: () =>
+      [...queryKeys.notifications.all, 'unread-count'] as const,
+    preferences: () =>
+      [...queryKeys.notifications.all, 'preferences'] as const,
   },
   categories: {
     all: ['categories'] as const,
@@ -76,5 +80,36 @@ export const queryKeys = {
   dashboard: {
     all: ['dashboard'] as const,
     attention: (scope: Record<string, unknown> = {}) => [...queryKeys.dashboard.all, 'attention', scope] as const,
+  },
+  templates: {
+    all: ['templates'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.templates.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.templates.all, 'detail', id] as const,
+  },
+  recurringTasks: {
+    all: ['recurring-tasks'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.recurringTasks.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.recurringTasks.all, 'detail', id] as const,
+  },
+  analytics: {
+    all: ['analytics'] as const,
+    dashboard: () => [...queryKeys.analytics.all, 'dashboard'] as const,
+    taskStatus: () => [...queryKeys.analytics.all, 'tasks', 'status'] as const,
+    taskCategory: () => [...queryKeys.analytics.all, 'tasks', 'category'] as const,
+    workload: () => [...queryKeys.analytics.all, 'workload'] as const,
+    requests: () => [...queryKeys.analytics.all, 'requests'] as const,
+  },
+  audit: {
+    all: ['audit'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.audit.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.audit.all, 'detail', id] as const,
+  },
+  settings: {
+    all: ['settings'] as const,
+  },
+  exports: {
+    all: ['exports'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.exports.all, 'list', filters] as const,
+    detail: (id: string) => [...queryKeys.exports.all, 'detail', id] as const,
   },
 } as const

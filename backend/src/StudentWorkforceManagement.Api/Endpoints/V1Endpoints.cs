@@ -29,7 +29,9 @@ using StudentWorkforceManagement.Application.Files.Queries;
 using StudentWorkforceManagement.Application.Marketplace.Commands;
 using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
 using StudentWorkforceManagement.Application.Notifications.Commands;
+using StudentWorkforceManagement.Application.Notifications.DTOs;
 using StudentWorkforceManagement.Application.Notifications.Queries.GetNotifications;
+using StudentWorkforceManagement.Application.Notifications.Queries.GetNotificationPreferences;
 using StudentWorkforceManagement.Application.RecurringTasks.Commands;
 using StudentWorkforceManagement.Application.RecurringTasks.Queries;
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
@@ -403,15 +405,69 @@ public static class V1Endpoints
         announcements.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteAnnouncementCommand(id), cancellationToken); return Results.NoContent(); }).RequireAuthorization("ADMIN");
     }
 
-    private static void MapNotifications(RouteGroupBuilder api)
-    {
-        var notifications = api.MapGroup("/notifications").RequireAuthorization().WithTags("Notifications");
-        notifications.MapGet("/", async ([AsParameters] PageParams page, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetNotificationsQuery { Page = page.Page, PageSize = ClampPageSize(page.PageSize), Search = page.Search }, cancellationToken)));
-        notifications.MapGet("/unread-count", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(new { count = await sender.Send(new GetUnreadNotificationCountQuery(), cancellationToken) }));
-        notifications.MapPost("/{id:guid}/read", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new MarkNotificationReadCommand(id), cancellationToken)));
-        notifications.MapPost("/read-all", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(new { count = await sender.Send(new MarkAllNotificationsReadCommand(), cancellationToken) }));
-        notifications.MapPut("/preferences", async (UpdateNotificationPreferenceCommand request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(request, cancellationToken)));
-    }
+  private static void MapNotifications(RouteGroupBuilder api)
+{
+    var notifications = api.MapGroup("/notifications")
+        .RequireAuthorization()
+        .WithTags("Notifications");
+
+    notifications.MapGet("/", async (
+        [AsParameters] PageParams page,
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await sender.Send(
+            new GetNotificationsQuery
+            {
+                Page = page.Page,
+                PageSize = ClampPageSize(page.PageSize),
+                Search = page.Search
+            },
+            cancellationToken)));
+
+    notifications.MapGet("/unread-count", async (
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(new
+        {
+            count = await sender.Send(
+                new GetUnreadNotificationCountQuery(),
+                cancellationToken)
+        }));
+
+    notifications.MapGet("/preferences", async (
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await sender.Send(
+            new GetNotificationPreferencesQuery(),
+            cancellationToken)))
+        .Produces<IReadOnlyCollection<NotificationPreferenceSettingDto>>(StatusCodes.Status200OK);
+
+    notifications.MapPost("/{id:guid}/read", async (
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await sender.Send(
+            new MarkNotificationReadCommand(id),
+            cancellationToken)));
+
+    notifications.MapPost("/read-all", async (
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(new
+        {
+            count = await sender.Send(
+                new MarkAllNotificationsReadCommand(),
+                cancellationToken)
+        }));
+
+    notifications.MapPut("/preferences", async (
+        UpdateNotificationPreferenceCommand request,
+        ISender sender,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await sender.Send(
+            request,
+            cancellationToken)));
+}
 
     private static void MapFeedback(RouteGroupBuilder api)
     {

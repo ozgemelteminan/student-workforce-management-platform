@@ -1,5 +1,5 @@
 import { apiRequest } from '../../../lib/api'
-import type { Notification, NotificationFilters, PaginatedResult, UnreadCountResponse } from '../types'
+import type { Notification, NotificationFilters, NotificationPreference, NotificationPreferenceSetting, PaginatedResult, UnreadCountResponse, UpdateNotificationPreferenceRequest } from '../types'
 
 function params(filters: Record<string, string | number | null | undefined>) {
   const search = new URLSearchParams()
@@ -24,4 +24,15 @@ export function markNotificationRead(id: string) {
 
 export function markAllNotificationsRead() {
   return apiRequest<UnreadCountResponse>('/notifications/read-all', { method: 'POST' })
+}
+
+export function getNotificationPreferences(signal?: AbortSignal) {
+  return apiRequest<NotificationPreferenceSetting[]>('/notifications/preferences', { signal })
+}
+
+export function updateNotificationPreference(request: UpdateNotificationPreferenceRequest) {
+  return apiRequest<NotificationPreference>('/notifications/preferences', {
+    method: 'PUT',
+    body: request,
+  })
 }

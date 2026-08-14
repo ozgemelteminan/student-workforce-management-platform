@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../lib/query'
 import { appToast } from '../../lib/toast'
-import { getNotifications, getUnreadNotificationCount, markAllNotificationsRead, markNotificationRead } from './api/notificationsApi'
-import type { NotificationFilters } from './types'
+import { getNotificationPreferences, getNotifications, getUnreadNotificationCount, markAllNotificationsRead, markNotificationRead, updateNotificationPreference } from './api/notificationsApi'
+import type { NotificationFilters, UpdateNotificationPreferenceRequest } from './types'
 
 export function useUnreadNotificationCount() {
   return useQuery({
@@ -16,6 +16,14 @@ export function useNotifications(filters: NotificationFilters, enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications.list(stableFilters(filters)),
     queryFn: ({ signal }) => getNotifications(filters, signal),
+    enabled,
+  })
+}
+
+export function useNotificationPreferences(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.notifications.preferences(),
+    queryFn: ({ signal }) => getNotificationPreferences(signal),
     enabled,
   })
 }
@@ -39,6 +47,13 @@ export function useNotificationMutations() {
       onSuccess: async () => {
         appToast.success('Notifications marked as read.')
         await invalidate()
+      },
+    }),
+    updatePreference: useMutation({
+      mutationFn: (request: UpdateNotificationPreferenceRequest) => updateNotificationPreference(request),
+      onSuccess: async () => {
+        appToast.success('Notification preference updated.')
+        await queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences() })
       },
     }),
   }

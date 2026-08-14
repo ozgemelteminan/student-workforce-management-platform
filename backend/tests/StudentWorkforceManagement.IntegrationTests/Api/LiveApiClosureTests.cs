@@ -189,6 +189,48 @@ public sealed class LiveApiClosureTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Notification_preferences_read_contract_is_user_scoped_and_reflects_put()
+    {
+        await using var factory = await TestApiFactory.CreateInitializedAsync();
+
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/v1/notifications/preferences")).StatusCode);
+
+        using var student = factory.CreateAuthenticatedClient(factory.Seed.StudentUserId, factory.Seed.StudentSessionId);
+        var defaults = await student.GetAsync("/api/v1/notifications/preferences");
+        Assert.Equal(HttpStatusCode.OK, defaults.StatusCode);
+        using var defaultsJson = await ReadJsonAsync(defaults);
+        Assert.Empty(defaultsJson.RootElement.EnumerateArray());
+
+        var update = await student.PutAsJsonAsync("/api/v1/notifications/preferences", new { preferenceType = "TaskAssigned", channel = "EMAIL", isEnabled = false });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var enable = await student.PutAsJsonAsync("/api/v1/notifications/preferences", new { preferenceType = "Announcement", channel = "IN_APP", isEnabled = true });
+        Assert.Equal(HttpStatusCode.OK, enable.StatusCode);
+
+        var afterPut = await student.GetAsync("/api/v1/notifications/preferences");
+        Assert.Equal(HttpStatusCode.OK, afterPut.StatusCode);
+        using var afterPutJson = await ReadJsonAsync(afterPut);
+        Assert.Equal(2, afterPutJson.RootElement.GetArrayLength());
+        var persisted = afterPutJson.RootElement.EnumerateArray().Single(preference =>
+            preference.GetProperty("preferenceType").GetString() == "TaskAssigned"
+            && preference.GetProperty("channel").GetString() == "EMAIL");
+        Assert.False(persisted.GetProperty("isEnabled").GetBoolean());
+        Assert.False(persisted.TryGetProperty("userId", out _));
+        Assert.False(persisted.TryGetProperty("id", out _));
+
+        var enabled = afterPutJson.RootElement.EnumerateArray().Single(preference =>
+            preference.GetProperty("preferenceType").GetString() == "Announcement"
+            && preference.GetProperty("channel").GetString() == "IN_APP");
+        Assert.True(enabled.GetProperty("isEnabled").GetBoolean());
+
+        using var admin = factory.CreateAuthenticatedClient(factory.Seed.AdminUserId, factory.Seed.AdminSessionId);
+        var adminRead = await admin.GetAsync("/api/v1/notifications/preferences");
+        Assert.Equal(HttpStatusCode.OK, adminRead.StatusCode);
+        using var adminJson = await ReadJsonAsync(adminRead);
+        Assert.Empty(adminJson.RootElement.EnumerateArray());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Durable_export_lifecycle_blocks_idor_and_streams_completed_artifacts()
     {
         await using var factory = await TestApiFactory.CreateInitializedAsync();

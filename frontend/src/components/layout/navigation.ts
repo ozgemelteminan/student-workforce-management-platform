@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  FileDown,
   FileText,
   FolderOpen,
   History,
@@ -65,6 +66,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'INSIGHTS',
     items: [
       { label: 'Analytics', href: '/analytics', icon: BarChart3, roles: staffRoles },
+      { label: 'Exports', href: '/exports', icon: FileDown, roles: allRoles },
     ],
   },
   {

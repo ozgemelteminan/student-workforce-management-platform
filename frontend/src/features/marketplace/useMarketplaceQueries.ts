@@ -21,7 +21,7 @@ export function useMarketplaceMutations() {
     claim: useMutation({
       mutationFn: (listingId: string) => claimMarketplaceListing(listingId),
       onSuccess: async () => {
-        appToast.success('Marketplace claim submitted.')
+        appToast.success('Task pool claim submitted.')
         await invalidate()
       },
     }),

@@ -11,6 +11,7 @@ public sealed class StudentSkillConfiguration : IEntityTypeConfiguration<Student
     {
         builder.ToTable("StudentSkills");
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Level).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(entity => entity.StudentId);
         builder.HasIndex(entity => new { entity.StudentId, entity.SkillId }).IsUnique();

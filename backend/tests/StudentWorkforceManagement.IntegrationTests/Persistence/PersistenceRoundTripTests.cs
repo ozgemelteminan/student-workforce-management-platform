@@ -4,6 +4,7 @@ using StudentWorkforceManagement.Domain.Entities;
 using StudentWorkforceManagement.Domain.Enums;
 using StudentWorkforceManagement.Infrastructure.Persistence;
 using StudentWorkforceManagement.Infrastructure.Persistence.Interceptors;
+using StudentWorkforceManagement.Infrastructure.Notifications.SignalR;
 using ThreadingTask = System.Threading.Tasks.Task;
 
 namespace StudentWorkforceManagement.IntegrationTests.Persistence;
@@ -20,11 +21,40 @@ public sealed class PersistenceRoundTripTests
 
         await using (var context = CreateContext(databaseName))
         {
+            var category = new Category { Id = Guid.NewGuid(), Name = "Ops" };
+            var task = new StudentWorkforceManagement.Domain.Entities.Task
+            {
+                Id = taskId,
+                Title = "Round trip task",
+                CategoryId = category.Id,
+                Category = category,
+                CreatedById = actorId,
+                Priority = TaskPriority.MEDIUM,
+                Difficulty = TaskDifficulty.EASY,
+                Status = Domain.Enums.TaskStatus.ASSIGNED,
+                Deadline = new DateTimeOffset(2026, 8, 17, 17, 0, 0, TimeSpan.Zero),
+                EstimatedDurationMinutes = 60
+            };
+            var student = new Student
+            {
+                Id = studentId,
+                UserId = Guid.NewGuid(),
+                FirstName = "Ada",
+                LastName = "Lovelace",
+                Email = "ada@example.edu",
+                Department = "Computer Engineering",
+                IsActive = true
+            };
+            context.Categories.Add(category);
+            context.Tasks.Add(task);
+            context.Students.Add(student);
             context.TaskAssignmentHistory.Add(new TaskAssignmentHistory
             {
                 Id = Guid.NewGuid(),
                 TaskId = taskId,
+                Task = task,
                 StudentId = studentId,
+                Student = student,
                 AssignedByUserId = actorId,
                 AssignedAt = new DateTimeOffset(2026, 8, 10, 10, 0, 0, TimeSpan.Zero),
                 Status = AssignmentStatus.ACTIVE,
@@ -37,7 +67,9 @@ public sealed class PersistenceRoundTripTests
             {
                 Id = Guid.NewGuid(),
                 TaskId = taskId,
+                Task = task,
                 RequestedById = studentId,
+                RequestedBy = student,
                 Type = RequestType.EXTENSION,
                 Reason = "Need more time",
                 CurrentDeadline = new DateTimeOffset(2026, 8, 17, 17, 0, 0, TimeSpan.Zero),
@@ -119,7 +151,36 @@ public sealed class PersistenceRoundTripTests
         }
     }
 
-    private static ApplicationDbContext CreateContext(string databaseName)
+    [Fact]
+    public async ThreadingTask Created_notifications_are_dispatched_after_save_without_blocking_persistence()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var dispatcher = new CapturingNotificationDispatcher { ThrowOnDispatch = true };
+        var notification = new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            Type = NotificationType.NUDGE,
+            Title = "Task nudge",
+            Message = "A teammate nudged you.",
+            RelatedEntityType = "Task",
+            RelatedEntityId = Guid.NewGuid()
+        };
+
+        await using (var context = CreateContext(databaseName, dispatcher))
+        {
+            context.Notifications.Add(notification);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = CreateContext(databaseName))
+        {
+            Assert.True(await context.Notifications.AnyAsync(item => item.Id == notification.Id));
+        }
+        Assert.Equal(notification.Id, Assert.Single(dispatcher.NotificationIds));
+    }
+
+    private static ApplicationDbContext CreateContext(string databaseName, INotificationRealtimeDispatcher? dispatcher = null)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName)
@@ -128,11 +189,27 @@ public sealed class PersistenceRoundTripTests
                 new ConcurrencyTokenInterceptor())
             .Options;
 
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, dispatcher);
     }
 
     private sealed class FakeClock : IUtcClock
     {
         public DateTimeOffset UtcNow { get; } = new(2026, 8, 10, 10, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class CapturingNotificationDispatcher : INotificationRealtimeDispatcher
+    {
+        public bool ThrowOnDispatch { get; init; }
+        public List<Guid> NotificationIds { get; } = new();
+
+        public ThreadingTask DispatchAsync(Notification notification, CancellationToken cancellationToken = default)
+        {
+            NotificationIds.Add(notification.Id);
+            if (ThrowOnDispatch)
+            {
+                throw new InvalidOperationException("SignalR unavailable.");
+            }
+            return ThreadingTask.CompletedTask;
+        }
     }
 }

@@ -43,7 +43,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { label: 'Dashboard', href: '/', icon: Home, roles: allRoles },
       { label: 'Tasks', href: '/tasks', icon: ClipboardList, roles: allRoles },
-      { label: 'Marketplace', href: '/marketplace', icon: Store, roles: allRoles },
+      { label: 'Task Pool', href: '/marketplace', icon: Store, roles: allRoles },
     ],
   },
   {

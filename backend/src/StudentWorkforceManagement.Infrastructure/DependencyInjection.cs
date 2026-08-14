@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using StudentWorkforceManagement.Application.Auth.Services;
@@ -45,14 +46,21 @@ namespace StudentWorkforceManagement.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
+        var isDevelopment = environment?.IsDevelopment() != false;
         services.AddSingleton<IUtcClock, UtcClock>();
         services.AddScoped<AuditableEntityInterceptor>();
         services.AddScoped<ConcurrencyTokenInterceptor>();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? configuration["DATABASE_CONNECTION_STRING"]
+        var configuredConnectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? configuration["DATABASE_CONNECTION_STRING"];
+        if (!isDevelopment && string.IsNullOrWhiteSpace(configuredConnectionString))
+        {
+            throw new InvalidOperationException("Production database connection string must be explicitly configured.");
+        }
+
+        var connectionString = configuredConnectionString
             ?? "Host=localhost;Port=5432;Database=student_workforce;Username=student_workforce;Password=student_workforce_dev_password";
 
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
@@ -78,7 +86,7 @@ public static class DependencyInjection
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(ValidateEmailOptions, "Invalid email provider configuration.")
+            .Validate(options => ValidateEmailOptions(options, isDevelopment), "Invalid email provider configuration.")
             .ValidateOnStart();
         var dataProtectionBuilder = services.AddDataProtection()
             .SetApplicationName("StudentWorkforceManagement");
@@ -113,7 +121,7 @@ public static class DependencyInjection
         services.AddOptions<StorageOptions>()
             .Bind(configuration.GetSection(StorageOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(ValidateStorageOptions, "Invalid storage provider configuration.")
+            .Validate(options => ValidateStorageOptions(options, isDevelopment), "Invalid storage provider configuration.")
             .ValidateOnStart();
         services.AddOptions<UploadFilePolicyOptions>()
             .Bind(configuration.GetSection(UploadFilePolicyOptions.SectionName))
@@ -187,19 +195,19 @@ public static class DependencyInjection
         return services;
     }
 
-    private static bool ValidateEmailOptions(EmailOptions options)
+    private static bool ValidateEmailOptions(EmailOptions options, bool isDevelopment)
     {
         var provider = options.Provider.Trim().ToUpperInvariant();
         return provider switch
         {
-            "DEVELOPMENT" => true,
+            "DEVELOPMENT" => isDevelopment,
             "SMTP" => string.IsNullOrWhiteSpace(options.Smtp.Host) == false,
             "SENDGRID" => string.IsNullOrWhiteSpace(options.SendGridApiKey) == false,
             _ => false
         };
     }
 
-    private static bool ValidateStorageOptions(StorageOptions options)
+    private static bool ValidateStorageOptions(StorageOptions options, bool isDevelopment)
     {
         if (options.SignedUrlLifetimeMinutes > 60)
         {
@@ -208,7 +216,7 @@ public static class DependencyInjection
         var provider = options.Provider.Trim().ToUpperInvariant();
         return provider switch
         {
-            "LOCAL" => string.IsNullOrWhiteSpace(options.LocalRootPath) == false,
+            "LOCAL" => isDevelopment && string.IsNullOrWhiteSpace(options.LocalRootPath) == false,
             "S3" => string.IsNullOrWhiteSpace(options.S3.BucketName) == false && string.IsNullOrWhiteSpace(options.S3.AccessKey) == false && string.IsNullOrWhiteSpace(options.S3.SecretKey) == false,
             _ => false
         };

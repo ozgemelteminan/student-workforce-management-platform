@@ -12,6 +12,7 @@ public sealed class MarketplaceListingConfiguration : IEntityTypeConfiguration<M
         builder.ToTable("MarketplaceListings");
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.ApprovalMode).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(entity => entity.TaskId);

@@ -25,7 +25,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Dashboard" description="Operational priorities from real task and marketplace data." primaryAction={isStaff ? <Button iconBefore={<ClipboardList aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/tasks/new')}>Create task</Button> : <Button variant="outline" iconBefore={<Target aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/focus')}>Focus mode</Button>} />
+      <PageHeader title="Dashboard" description="Operational priorities from real task and task pool data." primaryAction={isStaff ? <Button iconBefore={<ClipboardList aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/tasks/new')}>Create task</Button> : <Button variant="outline" iconBefore={<Target aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/focus')}>Focus mode</Button>} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.8fr)]">
         <Card>
           <CardHeader>
@@ -53,7 +53,7 @@ export function DashboardPage() {
         </Card>
         <div className="space-y-5">
           <Metric title="Active accessible tasks" value={String(tasks.data?.totalCount ?? 0)} loading={tasks.isLoading} />
-          <Metric title="Open marketplace listings" value={String(marketplace.data?.totalCount ?? 0)} loading={marketplace.isLoading} />
+          <Metric title="Open task pool listings" value={String(marketplace.data?.totalCount ?? 0)} loading={marketplace.isLoading} />
           {canReview ? <Metric title="Submissions waiting review" value={String(reviewTasks.data?.totalCount ?? 0)} loading={reviewTasks.isLoading} /> : null}
         </div>
       </div>
@@ -81,12 +81,12 @@ export function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="text-sm font-semibold">Marketplace activity</h2>
-            <Link className="text-sm font-medium text-brand hover:text-brand-hover" to="/marketplace">Open marketplace</Link>
+            <h2 className="text-sm font-semibold">Task pool activity</h2>
+            <Link className="text-sm font-medium text-brand hover:text-brand-hover" to="/marketplace">Open task pool</Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {marketplace.isError ? <ErrorState title="Could not load marketplace." description="Marketplace data can be retried from its workspace." retryAction={<Button variant="outline" onClick={() => void marketplace.refetch()}>Retry</Button>} /> : null}
-            {!marketplace.isLoading && !marketplace.isError && marketplace.data?.items.length === 0 ? <EmptyState icon={<Store className="h-5 w-5" />} title="No open marketplace listings." /> : null}
+            {marketplace.isError ? <ErrorState title="Could not load task pool." description="Task pool data can be retried from its workspace." retryAction={<Button variant="outline" onClick={() => void marketplace.refetch()}>Retry</Button>} /> : null}
+            {!marketplace.isLoading && !marketplace.isError && marketplace.data?.items.length === 0 ? <EmptyState icon={<Store className="h-5 w-5" />} title="No open task pool listings." /> : null}
             {marketplace.data?.items.slice(0, 5).map((listing) => (
               <Link key={listing.id} to={`/tasks/${listing.taskId}`} className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-surface-secondary">
                 <span className="truncate text-sm font-medium">Task {listing.taskId.slice(0, 8)}</span>

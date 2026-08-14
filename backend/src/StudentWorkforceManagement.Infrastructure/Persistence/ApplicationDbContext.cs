@@ -1,12 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Domain.Entities;
+using StudentWorkforceManagement.Infrastructure.Notifications.SignalR;
 using DomainTask = StudentWorkforceManagement.Domain.Entities.Task;
 
 namespace StudentWorkforceManagement.Infrastructure.Persistence;
 
-public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IApplicationDbContext
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    INotificationRealtimeDispatcher? notificationRealtimeDispatcher = null,
+    ILogger<ApplicationDbContext>? logger = null) : DbContext(options), IApplicationDbContext
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
@@ -76,5 +81,32 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var createdNotifications = ChangeTracker.Entries<Notification>()
+            .Where(entry => entry.State == EntityState.Added)
+            .Select(entry => entry.Entity)
+            .ToList();
+
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        if (notificationRealtimeDispatcher is not null)
+        {
+            foreach (var notification in createdNotifications)
+            {
+                try
+                {
+                    await notificationRealtimeDispatcher.DispatchAsync(notification, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    logger?.LogWarning(exception, "Realtime notification dispatch failed for notification {NotificationId}", notification.Id);
+                }
+            }
+        }
+
+        return result;
     }
 }

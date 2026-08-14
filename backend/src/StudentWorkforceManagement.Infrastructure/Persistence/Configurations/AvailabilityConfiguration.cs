@@ -15,6 +15,7 @@ public sealed class AvailabilityConfiguration : IEntityTypeConfiguration<Availab
         });
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.DayOfWeek).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.Reason).HasMaxLength(500);

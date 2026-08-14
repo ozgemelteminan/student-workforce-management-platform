@@ -1,3 +1,9 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using StudentWorkforceManagement.Api;
+
 namespace StudentWorkforceManagement.IntegrationTests.Api;
 
 public sealed class ApiSurfaceVerificationTests
@@ -9,7 +15,7 @@ public sealed class ApiSurfaceVerificationTests
     {
         var program = Read("backend/src/StudentWorkforceManagement.Api/Program.cs");
 
-        Assert.Contains("builder.Services.AddApi(builder.Configuration);", program);
+        Assert.Contains("builder.Services.AddApi(builder.Configuration, builder.Environment);", program);
         Assert.Contains("app.UseMiddleware<ExceptionHandlingMiddleware>();", program);
         Assert.Contains("app.UseMiddleware<SecurityHeadersMiddleware>();", program);
         Assert.Contains("app.UseAuthentication();", program);
@@ -52,6 +58,22 @@ public sealed class ApiSurfaceVerificationTests
     }
 
     [Fact]
+    public void Api_production_configuration_requires_explicit_hosts_and_cors_origins()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AllowedHosts"] = "*",
+                ["Cors:AllowedOrigins:0"] = "https://app.example.edu"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddApi(configuration, new FakeHostEnvironment("Production")));
+
+        Assert.Contains("Production AllowedHosts", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Hangfire_dashboard_and_signalr_hub_require_authenticated_users()
     {
         var infrastructureEndpoints = Read("backend/src/StudentWorkforceManagement.Infrastructure/Hosting/InfrastructureEndpointRouteBuilderExtensions.cs");
@@ -82,5 +104,13 @@ public sealed class ApiSurfaceVerificationTests
         }
 
         throw new InvalidOperationException("Could not locate repository root.");
+    }
+
+    private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ApplicationName { get; set; } = "StudentWorkforceManagement.Tests";
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

@@ -12,6 +12,7 @@ public sealed class TaskRequestConfiguration : IEntityTypeConfiguration<TaskRequ
         builder.ToTable("TaskRequests");
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null && entity.RequestedBy!.DeletedAt == null);
         builder.Property(entity => entity.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.Reason).HasMaxLength(2000).IsRequired();

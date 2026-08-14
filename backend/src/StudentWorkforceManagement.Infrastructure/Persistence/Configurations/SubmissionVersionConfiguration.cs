@@ -16,6 +16,12 @@ public sealed class SubmissionVersionConfiguration : IEntityTypeConfiguration<Su
         });
         builder.ConfigureAuditableEntity();
         builder.ConfigureSoftDelete();
+        builder.HasQueryFilter(entity =>
+            entity.DeletedAt == null &&
+            entity.TaskSubmission!.DeletedAt == null &&
+            entity.TaskSubmission.Task!.DeletedAt == null &&
+            entity.TaskSubmission.SubmittedBy!.DeletedAt == null &&
+            entity.UploadedBy!.DeletedAt == null);
         builder.Property(entity => entity.FileStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.OwnsOne(entity => entity.File, owned => owned.ConfigureFileMetadata());
         builder.HasIndex(entity => entity.TaskSubmissionId);

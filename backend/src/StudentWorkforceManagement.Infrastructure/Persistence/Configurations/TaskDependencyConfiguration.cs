@@ -14,6 +14,7 @@ public sealed class TaskDependencyConfiguration : IEntityTypeConfiguration<TaskD
             table.HasCheckConstraint("CK_TaskDependencies_NoSelfDependency", "\"TaskId\" <> \"DependsOnTaskId\"");
         });
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null && entity.DependsOnTask!.DeletedAt == null);
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => new { entity.TaskId, entity.DependsOnTaskId }).IsUnique();
         builder.HasOne(entity => entity.Task)

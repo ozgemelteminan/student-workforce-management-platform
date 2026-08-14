@@ -14,6 +14,7 @@ public sealed class TemporaryUnavailabilityConfiguration : IEntityTypeConfigurat
         });
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Category).HasMaxLength(80).IsRequired();
         builder.Property(entity => entity.Note).HasMaxLength(1000);
         builder.HasIndex(entity => new { entity.StudentId, entity.StartAt, entity.EndAt });

@@ -12,6 +12,7 @@ public sealed class TaskAssignmentHistoryConfiguration : IEntityTypeConfiguratio
         builder.ToTable("TaskAssignmentHistory");
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null && entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.Mode).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.Reason).HasMaxLength(1000);

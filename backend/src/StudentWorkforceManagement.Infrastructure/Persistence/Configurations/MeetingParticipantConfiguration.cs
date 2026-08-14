@@ -11,6 +11,7 @@ public sealed class MeetingParticipantConfiguration : IEntityTypeConfiguration<M
         builder.ToTable("MeetingParticipants");
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.CampusPresence).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.AvailableRangesJson).HasMaxLength(12000);
         builder.Property(entity => entity.Note).HasMaxLength(1000);

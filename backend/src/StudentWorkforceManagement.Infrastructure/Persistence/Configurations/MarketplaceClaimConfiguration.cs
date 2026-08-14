@@ -12,6 +12,7 @@ public sealed class MarketplaceClaimConfiguration : IEntityTypeConfiguration<Mar
         builder.ToTable("MarketplaceClaims");
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.MarketplaceListing!.Task!.DeletedAt == null && entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(entity => entity.MarketplaceListingId);
         builder.HasIndex(entity => entity.StudentId);

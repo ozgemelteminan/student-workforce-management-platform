@@ -14,6 +14,7 @@ public sealed class FeedbackConfiguration : IEntityTypeConfiguration<Feedback>
             table.HasCheckConstraint("CK_Feedback_Rating", "\"Rating\" IS NULL OR (\"Rating\" >= 1 AND \"Rating\" <= 5)");
         });
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null && entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Comment).HasMaxLength(4000);
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => entity.StudentId);

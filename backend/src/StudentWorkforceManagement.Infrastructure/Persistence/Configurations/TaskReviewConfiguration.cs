@@ -11,6 +11,11 @@ public sealed class TaskReviewConfiguration : IEntityTypeConfiguration<TaskRevie
     {
         builder.ToTable("TaskReviews");
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity =>
+            entity.Task!.DeletedAt == null &&
+            entity.Submission!.DeletedAt == null &&
+            entity.Submission.Task!.DeletedAt == null &&
+            entity.Submission.SubmittedBy!.DeletedAt == null);
         builder.Property(entity => entity.ReviewerComment).HasMaxLength(2000);
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => entity.SubmissionId);

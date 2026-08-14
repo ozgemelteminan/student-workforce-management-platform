@@ -335,10 +335,14 @@ public sealed class ApplicationCompletionTests
     {
         await using var context = CreateContext();
         var category = new Category { Id = Guid.NewGuid(), Name = "Ops" };
+        var student = new Student { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), FirstName = "Ada", LastName = "Lovelace", Email = "analytics@example.edu", Department = "Computer Engineering", IsActive = true };
+        var completedTask = new StudentWorkforceManagement.Domain.Entities.Task { Id = Guid.NewGuid(), Title = "Done", CategoryId = category.Id, Category = category, CreatedById = Guid.NewGuid(), Priority = TaskPriority.MEDIUM, Difficulty = TaskDifficulty.EASY, Status = TaskStatus.COMPLETED, Deadline = DateTimeOffset.UtcNow.AddDays(-1), EstimatedDurationMinutes = 20 };
+        var lateTask = new StudentWorkforceManagement.Domain.Entities.Task { Id = Guid.NewGuid(), Title = "Late", CategoryId = category.Id, Category = category, CreatedById = Guid.NewGuid(), Priority = TaskPriority.MEDIUM, Difficulty = TaskDifficulty.EASY, Status = TaskStatus.IN_PROGRESS, Deadline = DateTimeOffset.UtcNow.AddDays(-1), EstimatedDurationMinutes = 30 };
         context.Categories.Add(category);
-        context.Tasks.Add(new StudentWorkforceManagement.Domain.Entities.Task { Id = Guid.NewGuid(), Title = "Done", CategoryId = category.Id, CreatedById = Guid.NewGuid(), Priority = TaskPriority.MEDIUM, Difficulty = TaskDifficulty.EASY, Status = TaskStatus.COMPLETED, Deadline = DateTimeOffset.UtcNow.AddDays(-1), EstimatedDurationMinutes = 20 });
-        context.Tasks.Add(new StudentWorkforceManagement.Domain.Entities.Task { Id = Guid.NewGuid(), Title = "Late", CategoryId = category.Id, CreatedById = Guid.NewGuid(), Priority = TaskPriority.MEDIUM, Difficulty = TaskDifficulty.EASY, Status = TaskStatus.IN_PROGRESS, Deadline = DateTimeOffset.UtcNow.AddDays(-1), EstimatedDurationMinutes = 30 });
-        context.TaskRequests.Add(new TaskRequest { Id = Guid.NewGuid(), TaskId = context.Tasks.Local.Last().Id, RequestedById = Guid.NewGuid(), Type = RequestType.EXTENSION, Status = RequestStatus.PENDING, Reason = "Need time" });
+        context.Students.Add(student);
+        context.Tasks.Add(completedTask);
+        context.Tasks.Add(lateTask);
+        context.TaskRequests.Add(new TaskRequest { Id = Guid.NewGuid(), TaskId = lateTask.Id, Task = lateTask, RequestedById = student.Id, RequestedBy = student, Type = RequestType.EXTENSION, Status = RequestStatus.PENDING, Reason = "Need time" });
         await context.SaveChangesAsync();
         var handler = new AnalyticsQueryHandler(context, new FakeClock(DateTimeOffset.UtcNow));
 

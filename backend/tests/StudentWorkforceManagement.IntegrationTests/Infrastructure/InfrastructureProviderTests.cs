@@ -13,6 +13,7 @@ using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Domain.Entities;
 using StudentWorkforceManagement.Domain.Enums;
+using StudentWorkforceManagement.Infrastructure;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.EmailDispatch;
 using StudentWorkforceManagement.Infrastructure.BackgroundJobs.OverdueTasks;
@@ -71,6 +72,55 @@ public sealed class InfrastructureProviderTests
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         Assert.Empty(context.Users);
         Assert.Empty(context.Roles);
+    }
+
+    [Fact]
+    public void Infrastructure_production_requires_explicit_database_connection()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Issuer"] = "tests",
+                ["Jwt:Audience"] = "tests",
+                ["Jwt:SigningKey"] = "TEST_ONLY_SIGNING_KEY_0123456789_32_CHARS",
+                ["Email:Provider"] = "SMTP",
+                ["Email:Smtp:Host"] = "smtp.example.edu",
+                ["Storage:Provider"] = "S3",
+                ["Storage:S3:BucketName"] = "student-workforce",
+                ["Storage:S3:AccessKey"] = "access",
+                ["Storage:S3:SecretKey"] = "secret"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => services.AddInfrastructure(configuration, new FakeHostEnvironment("Production")));
+
+        Assert.Contains("Production database connection string", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Infrastructure_production_rejects_development_email_and_local_storage()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DATABASE_CONNECTION_STRING"] = "Host=localhost;Port=5432;Database=tests;Username=tests;Password=tests",
+                ["Jwt:Issuer"] = "tests",
+                ["Jwt:Audience"] = "tests",
+                ["Jwt:SigningKey"] = "TEST_ONLY_SIGNING_KEY_0123456789_32_CHARS",
+                ["Email:Provider"] = "Development",
+                ["Storage:Provider"] = "Local",
+                ["Storage:LocalRootPath"] = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure(configuration, new FakeHostEnvironment("Production"));
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<EmailOptions>>().Value);
+        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<StorageOptions>>().Value);
     }
 
     [Fact]

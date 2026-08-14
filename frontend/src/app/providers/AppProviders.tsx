@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '../../lib/auth/AuthProvider'
 import { createAppQueryClient } from '../../lib/query'
+import { RealtimeProvider } from '../../services/signalr/RealtimeProvider'
 import '../../i18n'
 
 type AppProvidersProps = {
@@ -15,7 +16,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        <RealtimeProvider>{children}</RealtimeProvider>
         <Toaster
           closeButton
           position="top-right"

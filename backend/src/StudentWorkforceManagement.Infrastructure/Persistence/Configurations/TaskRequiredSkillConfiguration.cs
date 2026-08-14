@@ -11,6 +11,7 @@ public sealed class TaskRequiredSkillConfiguration : IEntityTypeConfiguration<Ta
     {
         builder.ToTable("TaskRequiredSkills");
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null);
         builder.Property(entity => entity.MinimumLevel).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => new { entity.TaskId, entity.SkillId }).IsUnique();

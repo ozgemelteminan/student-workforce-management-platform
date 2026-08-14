@@ -12,7 +12,7 @@ public sealed class TaskCommentConfiguration : IEntityTypeConfiguration<TaskComm
         builder.ToTable("TaskComments");
         builder.ConfigureAuditableEntity();
         builder.ConfigureSoftDelete();
-        builder.HasQueryFilter(entity => entity.DeletedAt == null);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null && entity.Task!.DeletedAt == null);
         builder.Property(entity => entity.Content).HasMaxLength(8000).IsRequired();
         builder.Property(entity => entity.Visibility).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.HasIndex(entity => entity.TaskId);

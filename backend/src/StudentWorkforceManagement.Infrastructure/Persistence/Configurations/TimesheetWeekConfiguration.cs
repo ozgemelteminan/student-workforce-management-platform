@@ -14,6 +14,7 @@ public sealed class TimesheetWeekConfiguration : IEntityTypeConfiguration<Timesh
         });
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.ReviewerComment).HasMaxLength(2000);
         builder.HasIndex(entity => new { entity.StudentId, entity.WeekStartDate }).IsUnique();

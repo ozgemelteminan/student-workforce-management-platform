@@ -10,8 +10,8 @@ using StudentWorkforceManagement.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddApi(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
+builder.Services.AddApi(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -33,7 +33,10 @@ else
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseCors("Frontend");
 app.UseAuthentication();

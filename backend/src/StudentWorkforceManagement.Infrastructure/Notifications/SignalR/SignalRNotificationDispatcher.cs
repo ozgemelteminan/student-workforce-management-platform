@@ -16,10 +16,9 @@ public sealed class SignalRNotificationDispatcher(IHubContext<NotificationHub> h
         logger.LogInformation("Dispatching notification {NotificationId} to user {UserId}", notification.Id, notification.UserId);
         await hubContext.Clients.User(notification.UserId.ToString("D")).SendAsync("NotificationCreated", new
         {
-            notification.Id,
-            notification.Type,
-            notification.Title,
-            notification.Message,
+            EventType = "notification.created",
+            NotificationId = notification.Id,
+            NotificationType = notification.Type.ToString(),
             notification.RelatedEntityType,
             notification.RelatedEntityId,
             notification.CreatedAt

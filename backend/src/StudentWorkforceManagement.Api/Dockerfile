@@ -11,7 +11,7 @@ RUN dotnet publish backend/src/StudentWorkforceManagement.Api/StudentWorkforceMa
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "StudentWorkforceManagement.Api.dll"]

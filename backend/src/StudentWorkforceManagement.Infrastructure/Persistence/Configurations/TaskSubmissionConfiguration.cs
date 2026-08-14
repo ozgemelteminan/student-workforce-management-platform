@@ -13,7 +13,7 @@ public sealed class TaskSubmissionConfiguration : IEntityTypeConfiguration<TaskS
         builder.ConfigureAuditableEntity();
         builder.ConfigureSoftDelete();
         builder.ConfigureConcurrencyToken();
-        builder.HasQueryFilter(entity => entity.DeletedAt == null);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null && entity.Task!.DeletedAt == null && entity.SubmittedBy!.DeletedAt == null);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => entity.SubmittedById);

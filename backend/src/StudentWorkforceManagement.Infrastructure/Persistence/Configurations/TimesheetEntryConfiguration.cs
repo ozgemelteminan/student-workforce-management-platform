@@ -14,6 +14,7 @@ public sealed class TimesheetEntryConfiguration : IEntityTypeConfiguration<Times
         });
         builder.ConfigureAuditableEntity();
         builder.ConfigureConcurrencyToken();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null && entity.TimesheetWeek!.Student!.DeletedAt == null);
         builder.Property(entity => entity.Note).HasMaxLength(1000);
         builder.HasIndex(entity => entity.TimesheetWeekId);
         builder.HasIndex(entity => entity.TaskId);

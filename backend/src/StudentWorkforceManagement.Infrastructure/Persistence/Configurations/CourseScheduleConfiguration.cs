@@ -14,6 +14,7 @@ public sealed class CourseScheduleConfiguration : IEntityTypeConfiguration<Cours
             table.HasCheckConstraint("CK_CourseSchedules_TimeRange", "\"EndTime\" > \"StartTime\"");
         });
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Student!.DeletedAt == null);
         builder.Property(entity => entity.CourseName).HasMaxLength(200).IsRequired();
         builder.Property(entity => entity.CourseCode).HasMaxLength(50).IsRequired();
         builder.Property(entity => entity.DayOfWeek).HasConversion<string>().HasMaxLength(16).IsRequired();

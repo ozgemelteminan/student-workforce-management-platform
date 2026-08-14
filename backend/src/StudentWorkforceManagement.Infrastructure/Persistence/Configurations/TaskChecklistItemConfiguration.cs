@@ -14,6 +14,7 @@ public sealed class TaskChecklistItemConfiguration : IEntityTypeConfiguration<Ta
             table.HasCheckConstraint("CK_TaskChecklistItems_Order", "\"Order\" >= 0");
         });
         builder.ConfigureAuditableEntity();
+        builder.HasQueryFilter(entity => entity.Task!.DeletedAt == null);
         builder.Property(entity => entity.Title).HasMaxLength(300).IsRequired();
         builder.HasIndex(entity => entity.TaskId);
         builder.HasIndex(entity => new { entity.TaskId, entity.Order });

@@ -19,8 +19,10 @@ namespace StudentWorkforceManagement.Api;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
+        ValidateProductionApiConfiguration(configuration, environment);
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
         services.AddMemoryCache();
@@ -170,5 +172,25 @@ public static class DependencyInjection
             });
         });
         return services;
+    }
+
+    private static void ValidateProductionApiConfiguration(IConfiguration configuration, IHostEnvironment? environment)
+    {
+        if (environment?.IsDevelopment() != false)
+        {
+            return;
+        }
+
+        var allowedHosts = configuration["AllowedHosts"];
+        if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts.Trim() == "*")
+        {
+            throw new InvalidOperationException("Production AllowedHosts must be explicitly configured.");
+        }
+
+        var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        if (origins.Length == 0 || origins.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException("Production Cors:AllowedOrigins must include at least one explicit frontend origin.");
+        }
     }
 }

@@ -92,7 +92,7 @@ export function AnnouncementsPage() {
               ))}
             </div>
           ) : (
-            <EmptyState title="No announcements yet." description={isAdmin ? 'Create an announcement when there is an update to publish.' : 'Published department updates will appear here.'} className="min-h-48" />
+            <EmptyState title={search.trim() ? 'No matching announcements.' : 'No announcements yet.'} description={search.trim() ? 'Clear the search to return to all visible announcements.' : isAdmin ? 'Create an announcement when there is an update to publish.' : 'Published department updates will appear here.'} className="min-h-48" />
           )}
         </CardContent>
       </Card>

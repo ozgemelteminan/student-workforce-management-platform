@@ -17,7 +17,9 @@ public sealed class SemesterConfiguration : IEntityTypeConfiguration<Semester>
         builder.ConfigureConcurrencyToken();
         builder.Property(entity => entity.Name).HasMaxLength(120).IsRequired();
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.IsActive).HasDefaultValue(true).IsRequired();
         builder.HasIndex(entity => entity.Name).IsUnique();
+        builder.HasIndex(entity => entity.IsActive);
         builder.HasIndex(entity => entity.Status);
         builder.HasIndex(entity => entity.Status)
             .IsUnique()

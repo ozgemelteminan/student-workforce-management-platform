@@ -13,4 +13,6 @@ public sealed record TaskAssignmentHistoryDto(
     AssignmentMode Mode,
     bool IsActive,
     int? PlannedEffortMinutes,
-    string? Reason);
+    string? Reason,
+    string? StudentName = null,
+    string? AssignedByDisplayName = null);

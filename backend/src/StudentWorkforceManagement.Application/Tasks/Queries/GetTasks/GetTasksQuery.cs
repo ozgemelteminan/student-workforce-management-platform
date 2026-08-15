@@ -75,7 +75,7 @@ public sealed class GetTasksQueryHandler(StudentWorkforceManagement.Application.
             _ => query.OrderBy(task => task.Deadline)
         };
 
-        return await query.Select(task => new TaskDto(task.Id, task.Title, task.Description, task.CategoryId, task.SemesterId, task.Priority, task.Difficulty, task.Status, task.CreatedById, task.AssignedStudentId, task.StartDate, task.Deadline, task.EstimatedDurationMinutes, task.CreatedAt, task.UpdatedAt, task.CompletedAt, task.ConcurrencyToken))
+        return await query.Select(task => new TaskDto(task.Id, task.Title, task.Description, task.CategoryId, task.SemesterId, task.Priority, task.Difficulty, task.Status, task.CreatedById, task.AssignedStudentId, task.StartDate, task.Deadline, task.EstimatedDurationMinutes, task.CreatedAt, task.UpdatedAt, task.CompletedAt, task.ConcurrencyToken, null, null, null))
             .ToPaginatedResultAsync(request.Page, request.PageSize, cancellationToken);
     }
 }

@@ -29,8 +29,8 @@ export function AuditLogsPage() {
             {logs.data?.items.map((log) => (
               <div key={log.id} className="grid gap-3 bg-surface px-4 py-3 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><Badge variant="info">{log.action}</Badge><Badge>{log.entityType}</Badge>{log.entityId ? <span className="text-xs text-text-muted">{log.entityId}</span> : null}</div>
-                  <p className="mt-1 text-sm text-text-secondary">Actor {log.userId ?? 'system'} · {formatIstanbulDateTime(log.createdAt)}</p>
+                  <div className="flex flex-wrap items-center gap-2"><Badge variant="info">{formatAuditAction(log.action)}</Badge><Badge>{formatEntityType(log.entityType)}</Badge></div>
+                  <p className="mt-1 text-sm text-text-secondary">{formatActor(log)} · {formatIstanbulDateTime(log.createdAt)}</p>
                 </div>
                 <Button variant="outline" size="sm" iconBefore={<Eye aria-hidden="true" className="h-4 w-4" />} onClick={() => setSelectedId(log.id)}>Details</Button>
               </div>
@@ -46,4 +46,24 @@ export function AuditLogsPage() {
       </Dialog>
     </div>
   )
+}
+
+function formatAuditAction(action: string) {
+  const known: Record<string, string> = {
+    UserLoggedIn: 'User logged in',
+    UserLoggedOut: 'User logged out',
+    SubmissionApproved: 'Submission approved',
+    SubmissionRevisionRequested: 'Submission revision requested',
+  }
+  return known[action] ?? action.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/User$/, '').trim()
+}
+
+function formatEntityType(entityType: string) {
+  return entityType.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+}
+
+function formatActor(log: { actorDisplayName?: string | null; actorEmail?: string | null; userId?: string }) {
+  if (log.actorDisplayName) return log.actorEmail ? `${log.actorDisplayName} (${log.actorEmail})` : log.actorDisplayName
+  if (log.actorEmail) return log.actorEmail
+  return log.userId ? 'User' : 'System'
 }

@@ -20,4 +20,7 @@ public sealed record TaskDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? CompletedAt,
-    Guid ConcurrencyToken);
+    Guid ConcurrencyToken,
+    string? CategoryName = null,
+    string? AssignedStudentName = null,
+    string? CreatedByDisplayName = null);

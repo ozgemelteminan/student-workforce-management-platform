@@ -8,6 +8,7 @@ export type Semester = {
   startDate: string
   endDate: string
   status: SemesterStatus
+  isActive: boolean
   concurrencyToken: string
 }
 

@@ -74,7 +74,7 @@ public sealed class SemesterCommandHandler(IApplicationDbContext dbContext) : IR
                 active.Status = SemesterStatus.ARCHIVED;
             }
         }
-        var semester = new Semester { Id = Guid.NewGuid(), Name = request.Name.Trim(), StartDate = request.StartDate, EndDate = request.EndDate, Status = request.Status };
+        var semester = new Semester { Id = Guid.NewGuid(), Name = request.Name.Trim(), StartDate = request.StartDate, EndDate = request.EndDate, Status = request.Status, IsActive = true };
         dbContext.Semesters.Add(semester);
         return System.Threading.Tasks.Task.FromResult(ToDto(semester));
     }
@@ -91,5 +91,5 @@ public sealed class SemesterCommandHandler(IApplicationDbContext dbContext) : IR
         return ToDto(semester);
     }
 
-    private static SemesterDto ToDto(Semester semester) => new(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken);
+    private static SemesterDto ToDto(Semester semester) => new(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken, semester.IsActive);
 }

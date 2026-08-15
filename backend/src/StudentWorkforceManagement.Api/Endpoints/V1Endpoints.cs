@@ -318,13 +318,15 @@ public static class V1Endpoints
     private static void MapSchedules(RouteGroupBuilder api)
     {
         var semesters = api.MapGroup("/semesters").RequireAuthorization().WithTags("Semesters");
-        semesters.MapGet("/", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSemestersQuery(), cancellationToken)));
+        semesters.MapGet("/", async (bool? includeInactive, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSemestersQuery(includeInactive == true), cancellationToken)));
         semesters.MapGet("/active", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetActiveSemesterQuery(), cancellationToken)));
         semesters.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSemesterQuery(id), cancellationToken)));
         semesters.MapPost("/", async (CreateSemesterCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/semesters", await sender.Send(request, cancellationToken))).RequireAuthorization("ADMIN");
         semesters.MapPut("/{id:guid}", async (Guid id, UpdateSemesterRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateSemesterCommand(id, request.Name, request.StartDate, request.EndDate, request.Status), cancellationToken))).RequireAuthorization("ADMIN");
         semesters.MapPost("/{id:guid}/activate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ActivateSemesterCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
         semesters.MapPost("/{id:guid}/archive", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ArchiveSemesterCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
+        semesters.MapPost("/{id:guid}/deactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new DeactivateSemesterCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
+        semesters.MapPost("/{id:guid}/reactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReactivateSemesterCommand(id), cancellationToken))).RequireAuthorization("ADMIN");
         semesters.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => { await sender.Send(new DeleteSemesterCommand(id), cancellationToken); return Results.NoContent(); }).RequireAuthorization("ADMIN");
 
         var schedules = api.MapGroup("/schedules").RequireAuthorization().WithTags("Schedules");

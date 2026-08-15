@@ -46,6 +46,6 @@ public sealed class AuditQueryHandler(StudentWorkforceManagement.Application.Com
 
     private static System.Linq.Expressions.Expression<Func<StudentWorkforceManagement.Domain.Entities.AuditLog, AuditLogDto>> ToDtoExpression()
     {
-        return log => new AuditLogDto(log.Id, log.UserId, log.Action, log.EntityType, log.EntityId, log.OldValue, log.NewValue, log.IpAddress, log.CorrelationId, log.CreatedAt);
+        return log => new AuditLogDto(log.Id, log.UserId, log.Action, log.EntityType, log.EntityId, log.OldValue, log.NewValue, log.IpAddress, log.CorrelationId, log.CreatedAt, log.User == null ? null : log.User.DisplayName, log.User == null ? null : log.User.Email);
     }
 }

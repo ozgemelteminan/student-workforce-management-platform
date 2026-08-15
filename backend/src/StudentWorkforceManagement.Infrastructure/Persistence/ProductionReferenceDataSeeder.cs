@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Domain.Entities;
+using StudentWorkforceManagement.Domain.Enums;
 using StudentWorkforceManagement.Infrastructure.Persistence.Interceptors;
 using StudentWorkforceManagement.Infrastructure.Time;
 
@@ -44,6 +45,13 @@ public static class ProductionReferenceDataSeeder
         "Web Development",
         "Git / GitHub",
         "Graphic Design"
+    ];
+
+    public static readonly IReadOnlyCollection<SemesterSeedDefinition> Semesters =
+    [
+        new("2026-2027 Fall", new DateOnly(2026, 9, 1), new DateOnly(2027, 1, 15), SemesterStatus.ACTIVE),
+        new("2026-2027 Spring", new DateOnly(2027, 2, 1), new DateOnly(2027, 6, 15), SemesterStatus.ARCHIVED),
+        new("2026-2027 Summer", new DateOnly(2027, 7, 1), new DateOnly(2027, 8, 31), SemesterStatus.ARCHIVED)
     ];
 
     public static bool ShouldRun(string[] args) => args.Any(argument => string.Equals(argument, CommandName, StringComparison.OrdinalIgnoreCase));
@@ -125,9 +133,32 @@ public static class ProductionReferenceDataSeeder
             existingSkills.Add(skill);
         }
 
+        var existingSemesters = await dbContext.Semesters.ToListAsync(cancellationToken);
+        foreach (var definition in Semesters)
+        {
+            if (existingSemesters.Any(semester => SameName(semester.Name, definition.Name)))
+            {
+                continue;
+            }
+
+            var semester = new Semester
+            {
+                Id = Guid.NewGuid(),
+                Name = definition.Name,
+                StartDate = definition.StartDate,
+                EndDate = definition.EndDate,
+                Status = definition.Status,
+                IsActive = true
+            };
+            dbContext.Semesters.Add(semester);
+            existingSemesters.Add(semester);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Production reference data seed completed for {CategoryCount} categories and {SkillCount} skills.", CategoryNames.Count, SkillNames.Count);
+        logger.LogInformation("Production reference data seed completed for {CategoryCount} categories, {SkillCount} skills, and {SemesterCount} semesters.", CategoryNames.Count, SkillNames.Count, Semesters.Count);
     }
 
     private static bool SameName(string left, string right) => string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    public sealed record SemesterSeedDefinition(string Name, DateOnly StartDate, DateOnly EndDate, SemesterStatus Status);
 }

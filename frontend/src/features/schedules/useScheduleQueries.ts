@@ -4,8 +4,8 @@ import { appToast } from '../../lib/toast'
 import { createAvailability, createSchedule, deleteAvailability, deleteSchedule, getActiveSemester, getCurrentStudentAvailability, getCurrentStudentSchedule, getSemesters, getStudentAvailability, getStudentSchedule, updateAvailability, updateSchedule } from './api/schedulesApi'
 import type { AvailabilityPayload, SchedulePayload, UpdateAvailabilityPayload, UpdateSchedulePayload } from './types'
 
-export function useSemesters() {
-  return useQuery({ queryKey: queryKeys.semesters.all, queryFn: ({ signal }) => getSemesters(signal) })
+export function useSemesters(includeInactive = false) {
+  return useQuery({ queryKey: queryKeys.semesters.list({ includeInactive }), queryFn: ({ signal }) => getSemesters(includeInactive, signal) })
 }
 
 export function useActiveSemester() {

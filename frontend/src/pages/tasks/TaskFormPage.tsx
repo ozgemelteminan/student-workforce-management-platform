@@ -72,6 +72,7 @@ export function TaskFormPage() {
   }, [form.formState.isDirty])
 
   const categories = lookups.categories.data ?? []
+  const semesters = lookups.semesters.data ?? []
   const submit = form.handleSubmit(async (values) => {
     setConflict(false)
     const payload = {
@@ -121,6 +122,14 @@ export function TaskFormPage() {
             )}</FormField>
             {lookups.categories.isError ? <p className="text-sm text-destructive lg:col-span-2">Categories could not be loaded. Refresh before creating a task.</p> : null}
             {!lookups.categories.isLoading && !lookups.categories.isError && categories.length === 0 ? <p className="text-sm text-text-secondary lg:col-span-2">No active categories are available.</p> : null}
+            <FormField label="Semester" error={form.formState.errors.semesterId?.message}>{({ id, describedBy }) => (
+              <Select value={form.watch('semesterId') || 'none'} disabled={lookups.semesters.isError || semesters.length === 0} onValueChange={(value) => form.setValue('semesterId', value === 'none' ? '' : value, { shouldDirty: true, shouldValidate: true })}>
+                <SelectTrigger id={id} aria-describedby={describedBy}><SelectValue placeholder={lookups.semesters.isLoading ? 'Loading semesters' : 'Select semester'} /></SelectTrigger>
+                <SelectContent><SelectItem value="none">No semester</SelectItem>{semesters.map((semester) => <SelectItem key={semester.id} value={semester.id}>{semester.name}</SelectItem>)}</SelectContent>
+              </Select>
+            )}</FormField>
+            {lookups.semesters.isError ? <p className="text-sm text-destructive lg:col-span-2">Semesters could not be loaded. Refresh before assigning a semester.</p> : null}
+            {!lookups.semesters.isLoading && !lookups.semesters.isError && semesters.length === 0 ? <p className="text-sm text-text-secondary lg:col-span-2">No active semesters are available.</p> : null}
             <FormField label="Priority" required>{({ id }) => <Select value={form.watch('priority')} onValueChange={(value) => form.setValue('priority', value as TaskPriority, { shouldDirty: true })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}</FormField>
             <FormField label="Difficulty" required>{({ id }) => <Select value={form.watch('difficulty')} onValueChange={(value) => form.setValue('difficulty', value as TaskDifficulty, { shouldDirty: true })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{['EASY', 'MEDIUM', 'HARD'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}</FormField>
             <FormField label="Start date" error={form.formState.errors.startDate?.message}>{({ id, describedBy, invalid }) => <Input id={id} type="datetime-local" invalid={invalid} aria-describedby={describedBy} {...form.register('startDate')} />}</FormField>

@@ -23,6 +23,11 @@ public sealed class GetAnnouncementsQueryHandler(StudentWorkforceManagement.Appl
         {
             query = query.Where(announcement => announcement.IsPublished && (!announcement.ExpiresAt.HasValue || announcement.ExpiresAt > now));
         }
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLower();
+            query = query.Where(announcement => announcement.Title.ToLower().Contains(search) || announcement.Content.ToLower().Contains(search));
+        }
         return await query.OrderByDescending(announcement => announcement.IsPinned).ThenByDescending(announcement => announcement.PublishedAt ?? announcement.CreatedAt)
             .Select(announcement => new AnnouncementDto(announcement.Id, announcement.Title, announcement.Content, announcement.CreatedById, announcement.ExpiresAt, announcement.IsPinned, announcement.IsPublished, announcement.PublishedAt, announcement.CreatedAt, announcement.UpdatedAt))
             .ToPaginatedResultAsync(request.Page, request.PageSize, cancellationToken);

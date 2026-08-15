@@ -10,6 +10,7 @@ public sealed class Semester : AuditableEntity, IHasConcurrencyToken
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public SemesterStatus Status { get; set; }
+    public bool IsActive { get; set; } = true;
     public Guid ConcurrencyToken { get; set; }
 
     public ICollection<CourseSchedule> CourseSchedules { get; set; } = new List<CourseSchedule>();

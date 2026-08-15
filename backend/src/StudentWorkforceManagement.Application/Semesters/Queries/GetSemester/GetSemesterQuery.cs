@@ -16,7 +16,7 @@ public sealed class GetSemesterQueryHandler(StudentWorkforceManagement.Applicati
 {
     public async System.Threading.Tasks.Task<SemesterDto> Handle(GetSemesterQuery request, CancellationToken cancellationToken)
     {
-        return await dbContext.Semesters.AsNoTracking().Where(semester => semester.Id == request.SemesterId).Select(semester => new SemesterDto(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken)).SingleOrDefaultAsync(cancellationToken)
+        return await dbContext.Semesters.AsNoTracking().Where(semester => semester.Id == request.SemesterId).Select(semester => new SemesterDto(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken, semester.IsActive)).SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("Semester", request.SemesterId);
     }
 }

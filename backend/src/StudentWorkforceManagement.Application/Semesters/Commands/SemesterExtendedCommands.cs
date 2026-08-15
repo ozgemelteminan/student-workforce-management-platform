@@ -17,6 +17,14 @@ public sealed record ArchiveSemesterCommand(Guid SemesterId) : IRequest<Semester
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AdminOnly;
 }
+public sealed record DeactivateSemesterCommand(Guid SemesterId) : IRequest<SemesterDto>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AdminOnly;
+}
+public sealed record ReactivateSemesterCommand(Guid SemesterId) : IRequest<SemesterDto>, IAuthorizableRequest
+{
+    public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AdminOnly;
+}
 public sealed record DeleteSemesterCommand(Guid SemesterId) : IRequest<Unit>, IAuthorizableRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.AdminOnly;
@@ -34,7 +42,7 @@ public sealed class UpdateSemesterCommandValidator : AbstractValidator<UpdateSem
 }
 
 public sealed class SemesterExtendedCommandHandler(IApplicationDbContext dbContext)
-    : IRequestHandler<UpdateSemesterCommand, SemesterDto>, IRequestHandler<ArchiveSemesterCommand, SemesterDto>, IRequestHandler<DeleteSemesterCommand, Unit>
+    : IRequestHandler<UpdateSemesterCommand, SemesterDto>, IRequestHandler<ArchiveSemesterCommand, SemesterDto>, IRequestHandler<DeactivateSemesterCommand, SemesterDto>, IRequestHandler<ReactivateSemesterCommand, SemesterDto>, IRequestHandler<DeleteSemesterCommand, Unit>
 {
     public async System.Threading.Tasks.Task<SemesterDto> Handle(UpdateSemesterCommand request, CancellationToken cancellationToken)
     {
@@ -61,6 +69,24 @@ public sealed class SemesterExtendedCommandHandler(IApplicationDbContext dbConte
         return ToDto(semester);
     }
 
+    public async System.Threading.Tasks.Task<SemesterDto> Handle(DeactivateSemesterCommand request, CancellationToken cancellationToken)
+    {
+        var semester = await dbContext.Semesters.SingleOrDefaultAsync(entity => entity.Id == request.SemesterId, cancellationToken)
+            ?? throw new NotFoundException("Semester", request.SemesterId);
+        semester.IsActive = false;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToDto(semester);
+    }
+
+    public async System.Threading.Tasks.Task<SemesterDto> Handle(ReactivateSemesterCommand request, CancellationToken cancellationToken)
+    {
+        var semester = await dbContext.Semesters.SingleOrDefaultAsync(entity => entity.Id == request.SemesterId, cancellationToken)
+            ?? throw new NotFoundException("Semester", request.SemesterId);
+        semester.IsActive = true;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToDto(semester);
+    }
+
     public async System.Threading.Tasks.Task<Unit> Handle(DeleteSemesterCommand request, CancellationToken cancellationToken)
     {
         var semester = await dbContext.Semesters.SingleOrDefaultAsync(entity => entity.Id == request.SemesterId, cancellationToken)
@@ -77,5 +103,5 @@ public sealed class SemesterExtendedCommandHandler(IApplicationDbContext dbConte
         return Unit.Value;
     }
 
-    private static SemesterDto ToDto(StudentWorkforceManagement.Domain.Entities.Semester semester) => new(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken);
+    private static SemesterDto ToDto(StudentWorkforceManagement.Domain.Entities.Semester semester) => new(semester.Id, semester.Name, semester.StartDate, semester.EndDate, semester.Status, semester.ConcurrencyToken, semester.IsActive);
 }

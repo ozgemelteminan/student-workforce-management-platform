@@ -58,6 +58,17 @@ describe('signed url helpers', () => {
     expect(progress).toHaveBeenCalledWith(50)
   })
 
+  it('rejects signed uploads when storage returns a non-success status', async () => {
+    vi.stubGlobal('XMLHttpRequest', class extends FakeXhr {
+      constructor() {
+        super()
+        this.status = 403
+      }
+    })
+
+    await expect(uploadSignedFile({ signedUploadUrl: 'https://storage.example/upload', uploadMethod: 'PUT' }, new File(['test'], 'file.txt'))).rejects.toThrow('Signed upload failed.')
+  })
+
   it('triggers browser-native download through a temporary anchor', () => {
     const anchor = document.createElement('a')
     const click = vi.spyOn(anchor, 'click').mockImplementation(() => undefined)

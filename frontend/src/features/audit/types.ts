@@ -13,6 +13,8 @@ export type AuditLog = {
   ipAddress?: string
   correlationId?: string
   createdAt: string
+  actorDisplayName?: string | null
+  actorEmail?: string | null
 }
 
 export type AuditFilters = {

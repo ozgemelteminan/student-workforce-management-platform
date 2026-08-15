@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../lib/query'
 import { appToast } from '../../lib/toast'
 import { getCategories } from '../categories/api/categoriesApi'
+import { getSemesters } from '../schedules/api/schedulesApi'
 import { getSkills } from '../skills/api/skillsApi'
 import {
   addChecklistItem,
@@ -94,6 +95,7 @@ export function useRequiredSkills(taskId: string | undefined) {
 export function useTaskLookups() {
   return {
     categories: useQuery({ queryKey: queryKeys.categories.list({ includeInactive: false }), queryFn: ({ signal }) => getCategories(false, signal) }),
+    semesters: useQuery({ queryKey: queryKeys.semesters.list({ includeInactive: false }), queryFn: ({ signal }) => getSemesters(false, signal) }),
     skills: useQuery({ queryKey: queryKeys.skills.list({ includeInactive: false }), queryFn: ({ signal }) => getSkills(false, signal) }),
     students: useQuery({ queryKey: queryKeys.students.list({ page: 1, pageSize: 50 }), queryFn: ({ signal }) => getStudents(undefined, signal) }),
   }
@@ -141,7 +143,16 @@ export function useTaskMutations(taskId?: string) {
     toggleChecklist: useMutation({ mutationFn: ({ id, itemId, completed }: { id: string; itemId: string; completed: boolean }) => setChecklistItem(id, itemId, completed), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.checklist(variables.id) }) }),
     addComment: useMutation({ mutationFn: ({ id, content, visibility }: { id: string; content: string; visibility: 'STUDENT_VISIBLE' | 'INTERNAL' }) => addComment(id, content, visibility), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.comments(variables.id) }) }),
     addDependency: useMutation({ mutationFn: ({ id, dependsOnTaskId }: { id: string; dependsOnTaskId: string }) => addDependency(id, dependsOnTaskId), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.dependencies(variables.id) }) }),
-    initiateUpload: useMutation({ mutationFn: ({ id, file, signal, onProgress }: { id: string; file: File; signal?: AbortSignal; onProgress?: (progress: number) => void }) => uploadSubmissionFile(id, file, { signal, onProgress }), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.submissions(variables.id) }) }),
+    initiateUpload: useMutation({
+      mutationFn: ({ id, file, signal, onProgress }: { id: string; file: File; signal?: AbortSignal; onProgress?: (progress: number) => void }) => uploadSubmissionFile(id, file, { signal, onProgress }),
+      onSuccess: async (_, variables) => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.submissions(variables.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail(variables.id) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.reviews.all }),
+        ])
+      },
+    }),
     completeUpload: useMutation({ mutationFn: (versionId: string) => completeSubmissionUpload(versionId), onSuccess: async () => invalidateTask() }),
     downloadVersion: useMutation({
       mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => getSubmissionVersionDownloadUrl(submissionId, versionId),

@@ -14,3 +14,5 @@ Signed URL lifetime is configured through `Storage:SignedUrlLifetimeMinutes`; de
 ## CORS
 
 Production object storage CORS must explicitly allow only trusted frontend origins. Required methods are `PUT`, `GET`, and `HEAD`; include `POST` only if multipart upload support is enabled. Do not allow wildcard origins with credentials, and do not allow browser `DELETE` operations.
+
+For the current production frontend, the S3-compatible bucket CORS allowlist must include `https://student-workforce-management-platfo.vercel.app` plus the approved local development origins. Backblaze B2 S3 CORS rules should permit the equivalent upload/download operations (`s3_put`, `s3_get`) and response headers needed for browser `PUT`, `GET`, and metadata verification.

@@ -30,6 +30,7 @@ export const queryKeys = {
   },
   semesters: {
     all: ['semesters'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.semesters.all, 'list', filters] as const,
     active: () => [...queryKeys.semesters.all, 'active'] as const,
   },
   schedules: {

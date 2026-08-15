@@ -36,6 +36,9 @@ export type Task = {
   updatedAt: string
   completedAt?: string
   concurrencyToken: string
+  categoryName?: string | null
+  assignedStudentName?: string | null
+  createdByDisplayName?: string | null
 }
 
 export type TaskFilters = {
@@ -149,6 +152,8 @@ export type TaskAssignmentHistory = {
   isActive: boolean
   plannedEffortMinutes?: number
   reason?: string
+  studentName?: string | null
+  assignedByDisplayName?: string | null
 }
 
 export type AssignmentRecommendation = {

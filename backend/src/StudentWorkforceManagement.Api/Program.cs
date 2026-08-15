@@ -9,6 +9,17 @@ using StudentWorkforceManagement.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (ProductionSmokeTestStudentSeeder.ShouldRun(args))
+{
+    await ProductionSmokeTestStudentSeeder.RunCliAsync(builder.Configuration, builder.Environment);
+    return;
+}
+if (ProductionReferenceDataSeeder.ShouldRun(args))
+{
+    await ProductionReferenceDataSeeder.RunCliAsync(builder.Configuration, builder.Environment);
+    return;
+}
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddApi(builder.Configuration, builder.Environment);

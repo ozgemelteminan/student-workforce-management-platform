@@ -80,6 +80,7 @@ export type Category = {
   id: string
   name: string
   description?: string
+  isActive: boolean
 }
 
 export type Student = {
@@ -99,6 +100,7 @@ export type Skill = {
   id: string
   name: string
   description?: string
+  isActive: boolean
 }
 
 export type TaskChecklistItem = {

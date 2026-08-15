@@ -423,7 +423,7 @@ public sealed class LiveApiClosureTests
 
         using var openApi = JsonDocument.Parse(await anonymous.GetStringAsync("/openapi/v1.json"));
         var operations = EnumerateApplicationOperations(openApi.RootElement);
-        Assert.Equal(176, operations.Count);
+        Assert.Equal(184, operations.Count);
 
         var results = new Dictionary<string, HttpStatusCode>(StringComparer.OrdinalIgnoreCase);
         foreach (var operation in operations)
@@ -437,7 +437,7 @@ public sealed class LiveApiClosureTests
         }
 
         Assert.Equal(operations.Count, results.Count);
-        Assert.Equal(176, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
+        Assert.Equal(184, results.Values.Count(status => !IsUnexpectedExecutionFailure(status)));
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)

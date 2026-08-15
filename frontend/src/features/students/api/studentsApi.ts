@@ -1,5 +1,5 @@
 import { apiRequest } from '../../../lib/api'
-import type { Feedback, PaginatedResult, Skill, Student, StudentFilters, StudentProfile, StudentSkillDetail, UpsertStudentSkillPayload, UpdateStudentPayload } from '../types'
+import type { Feedback, PaginatedResult, Student, StudentFilters, StudentProfile, StudentSkillDetail, UpsertStudentSkillPayload, UpdateStudentPayload } from '../types'
 
 function params(filters: Record<string, string | number | undefined>) {
   const search = new URLSearchParams()
@@ -40,10 +40,6 @@ export function getStudentFeedback(studentId: string, page = 1, pageSize = 10, s
 
 export function getStudentSkills(studentId: string, signal?: AbortSignal) {
   return apiRequest<StudentSkillDetail[]>(`/students/${studentId}/skills`, { signal })
-}
-
-export function getSkills(signal?: AbortSignal) {
-  return apiRequest<Skill[]>('/skills', { signal })
 }
 
 export function upsertStudentSkill(studentId: string, payload: UpsertStudentSkillPayload) {

@@ -112,8 +112,14 @@ public sealed class TaskRequiredSkillCommandHandler(IApplicationDbContext dbCont
 
     private async System.Threading.Tasks.Task<Skill> GetSkillAsync(Guid skillId, CancellationToken cancellationToken)
     {
-        return await dbContext.Skills.AsNoTracking().SingleOrDefaultAsync(skill => skill.Id == skillId, cancellationToken)
+        var skill = await dbContext.Skills.AsNoTracking().SingleOrDefaultAsync(skill => skill.Id == skillId, cancellationToken)
             ?? throw new NotFoundException("Skill", skillId);
+        if (!skill.IsActive)
+        {
+            throw new ConflictException("Inactive skills cannot be selected.");
+        }
+
+        return skill;
     }
 
     private static TaskRequiredSkillDto ToDto(TaskRequiredSkill skill, string? skillName)

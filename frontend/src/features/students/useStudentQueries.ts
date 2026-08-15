@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../lib/query'
 import { appToast } from '../../lib/toast'
-import { activateStudent, deactivateStudent, getCurrentStudent, getSkills, getStudent, getStudentFeedback, getStudents, getStudentSkills, updateStudent, upsertStudentSkill } from './api/studentsApi'
+import { getSkills } from '../skills/api/skillsApi'
+import { activateStudent, deactivateStudent, getCurrentStudent, getStudent, getStudentFeedback, getStudents, getStudentSkills, updateStudent, upsertStudentSkill } from './api/studentsApi'
 import type { StudentFilters, UpsertStudentSkillPayload, UpdateStudentPayload } from './types'
 
 export function useStudents(filters: StudentFilters) {
@@ -33,7 +34,7 @@ export function useStudentSkills(studentId: string | undefined) {
 }
 
 export function useSkillCatalog() {
-  return useQuery({ queryKey: queryKeys.skills.all, queryFn: ({ signal }) => getSkills(signal) })
+  return useQuery({ queryKey: queryKeys.skills.list({ includeInactive: false }), queryFn: ({ signal }) => getSkills(false, signal) })
 }
 
 export function useStudentMutations(studentId?: string) {

@@ -13,6 +13,8 @@ public sealed class SkillConfiguration : IEntityTypeConfiguration<Skill>
         builder.ConfigureAuditableEntity();
         builder.Property(entity => entity.Name).HasMaxLength(120).IsRequired();
         builder.Property(entity => entity.Description).HasMaxLength(1000);
+        builder.Property(entity => entity.IsActive).HasDefaultValue(true).IsRequired();
         builder.HasIndex(entity => entity.Name).IsUnique();
+        builder.HasIndex(entity => entity.IsActive);
     }
 }

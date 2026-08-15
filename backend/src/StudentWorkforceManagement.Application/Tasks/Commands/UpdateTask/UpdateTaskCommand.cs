@@ -54,6 +54,10 @@ public sealed class UpdateTaskCommandHandler(IApplicationDbContext dbContext, IA
         {
             throw new ConcurrencyConflictException();
         }
+        if (!await dbContext.Categories.AnyAsync(category => category.Id == request.CategoryId && category.IsActive, cancellationToken))
+        {
+            throw new ConflictException("Inactive or missing categories cannot be selected.");
+        }
 
         task.Title = request.Title.Trim();
         task.Description = request.Description;

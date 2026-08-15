@@ -2,10 +2,8 @@ import { apiRequest } from '../../../lib/api'
 import { openSignedDownload as openTemporaryDownload, uploadSignedFile } from '../../../lib/signed-urls'
 import type {
   AssignmentRecommendation,
-  Category,
   Feedback,
   PaginatedResult,
-  Skill,
   Student,
   Submission,
   SubmissionDownloadUrl,
@@ -218,11 +216,11 @@ export function createTaskFeedback(taskId: string, studentId: string, rating?: n
 }
 
 export function getCategories(signal?: AbortSignal) {
-  return apiRequest<Category[]>('/categories', { signal })
+  return apiRequest<import('../../categories/types').Category[]>('/categories', { signal })
 }
 
 export function getSkills(signal?: AbortSignal) {
-  return apiRequest<Skill[]>('/skills', { signal })
+  return apiRequest<import('../../skills/types').Skill[]>('/skills', { signal })
 }
 
 export function getStudents(search?: string, signal?: AbortSignal) {

@@ -82,11 +82,13 @@ export function StudentDetailPage() {
             <StudentSkillsList skills={studentSkills.data ?? []} isLoading={studentSkills.isLoading} isError={studentSkills.isError} onRetry={() => void studentSkills.refetch()} />
             <form className="space-y-3" onSubmit={saveSkill}>
               <FormField label="Skill">{({ id }) => (
-                <Select value={skillId} onValueChange={setSkillId}>
-                  <SelectTrigger id={id}><SelectValue placeholder="Select skill" /></SelectTrigger>
+                <Select value={skillId} disabled={skills.isError || (skills.data ?? []).length === 0} onValueChange={setSkillId}>
+                  <SelectTrigger id={id}><SelectValue placeholder={skills.isLoading ? 'Loading skills' : 'Select skill'} /></SelectTrigger>
                   <SelectContent>{(skills.data ?? []).map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>)}</SelectContent>
                 </Select>
               )}</FormField>
+              {skills.isError ? <p className="text-sm text-destructive">Skills could not be loaded. Refresh before saving student skills.</p> : null}
+              {!skills.isLoading && !skills.isError && (skills.data ?? []).length === 0 ? <p className="text-sm text-text-secondary">No active skills are available.</p> : null}
               {selectedExistingSkill ? <p className="text-xs text-text-secondary">Saving {selectedExistingSkill.name} updates its current level.</p> : null}
               <FormField label="Level">{({ id }) => (
                 <Select value={level} onValueChange={(value) => setLevel(value as SkillLevel)}>

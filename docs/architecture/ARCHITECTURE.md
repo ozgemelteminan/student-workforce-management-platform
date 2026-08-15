@@ -10,6 +10,7 @@ Infrastructure implements mechanisms behind Application abstractions. Applicatio
 - Email: `IEmailService` persists `EmailDelivery` intent; `EmailDispatchJob` calls the configured `IEmailProvider`.
 - Email secret protection: one-time invitation/reset template values use a sensitive template-data channel. Infrastructure protects them with ASP.NET Core Data Protection before persistence and clears protected values after successful dispatch.
 - Storage: `IFileStorage` selects `Local` or `S3` through configuration.
+- Reference data: Categories classify task type; Skills describe capabilities on tasks and student profiles. ADMIN users manage both through dedicated CQRS/API flows, with deactivation used to preserve historical relationships.
 - Real-time notifications: persistent `Notification` rows remain canonical; SignalR is transport only.
 - Background jobs: Hangfire with PostgreSQL storage in the dedicated `hangfire` schema.
 - Redis: currently used for the optional SignalR backplane and Redis health verification. A general cache abstraction is deferred until stable-data query use cases consume it.

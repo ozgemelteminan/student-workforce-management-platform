@@ -8,6 +8,7 @@ public sealed class Skill : AuditableEntity
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
 
     public ICollection<StudentSkill> StudentSkills { get; set; } = new List<StudentSkill>();
     public ICollection<TaskRequiredSkill> TaskRequiredSkills { get; set; } = new List<TaskRequiredSkill>();

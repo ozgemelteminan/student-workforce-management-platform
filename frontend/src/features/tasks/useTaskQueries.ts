@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../lib/query'
 import { appToast } from '../../lib/toast'
+import { getCategories } from '../categories/api/categoriesApi'
+import { getSkills } from '../skills/api/skillsApi'
 import {
   addChecklistItem,
   addComment,
@@ -14,14 +16,12 @@ import {
   deleteRequiredSkill,
   deleteChecklistItem,
   getAssignmentHistory,
-  getCategories,
   getChecklist,
   getComments,
   getDependencies,
   getMyTasks,
   getRecommendations,
   getRequiredSkills,
-  getSkills,
   getStudents,
   getSubmissions,
   getSubmissionVersions,
@@ -93,8 +93,8 @@ export function useRequiredSkills(taskId: string | undefined) {
 
 export function useTaskLookups() {
   return {
-    categories: useQuery({ queryKey: queryKeys.categories.all, queryFn: ({ signal }) => getCategories(signal) }),
-    skills: useQuery({ queryKey: queryKeys.skills.all, queryFn: ({ signal }) => getSkills(signal) }),
+    categories: useQuery({ queryKey: queryKeys.categories.list({ includeInactive: false }), queryFn: ({ signal }) => getCategories(false, signal) }),
+    skills: useQuery({ queryKey: queryKeys.skills.list({ includeInactive: false }), queryFn: ({ signal }) => getSkills(false, signal) }),
     students: useQuery({ queryKey: queryKeys.students.list({ page: 1, pageSize: 50 }), queryFn: ({ signal }) => getStudents(undefined, signal) }),
   }
 }

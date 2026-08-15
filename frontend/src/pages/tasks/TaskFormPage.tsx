@@ -114,11 +114,13 @@ export function TaskFormPage() {
             {conflict ? <div className="lg:col-span-2"><ConflictMessage onReload={() => void task.refetch()} /></div> : null}
             <FormField label="Title" error={form.formState.errors.title?.message} required>{({ id, describedBy, invalid }) => <Input id={id} disabled={loading} invalid={invalid} aria-describedby={describedBy} {...form.register('title')} />}</FormField>
             <FormField label="Category" error={form.formState.errors.categoryId?.message} required>{({ id, describedBy }) => (
-              <Select value={form.watch('categoryId')} onValueChange={(value) => form.setValue('categoryId', value, { shouldDirty: true, shouldValidate: true })}>
+              <Select value={form.watch('categoryId')} disabled={lookups.categories.isError || categories.length === 0} onValueChange={(value) => form.setValue('categoryId', value, { shouldDirty: true, shouldValidate: true })}>
                 <SelectTrigger id={id} aria-describedby={describedBy}><SelectValue placeholder={lookups.categories.isLoading ? 'Loading categories' : 'Choose category'} /></SelectTrigger>
                 <SelectContent>{categories.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent>
               </Select>
             )}</FormField>
+            {lookups.categories.isError ? <p className="text-sm text-destructive lg:col-span-2">Categories could not be loaded. Refresh before creating a task.</p> : null}
+            {!lookups.categories.isLoading && !lookups.categories.isError && categories.length === 0 ? <p className="text-sm text-text-secondary lg:col-span-2">No active categories are available.</p> : null}
             <FormField label="Priority" required>{({ id }) => <Select value={form.watch('priority')} onValueChange={(value) => form.setValue('priority', value as TaskPriority, { shouldDirty: true })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}</FormField>
             <FormField label="Difficulty" required>{({ id }) => <Select value={form.watch('difficulty')} onValueChange={(value) => form.setValue('difficulty', value as TaskDifficulty, { shouldDirty: true })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{['EASY', 'MEDIUM', 'HARD'].map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select>}</FormField>
             <FormField label="Start date" error={form.formState.errors.startDate?.message}>{({ id, describedBy, invalid }) => <Input id={id} type="datetime-local" invalid={invalid} aria-describedby={describedBy} {...form.register('startDate')} />}</FormField>
@@ -127,6 +129,8 @@ export function TaskFormPage() {
             <FormField label="Description" className="lg:col-span-2" error={form.formState.errors.description?.message}>{({ id, describedBy, invalid }) => <Textarea id={id} invalid={invalid} aria-describedby={describedBy} {...form.register('description')} />}</FormField>
             <RequiredSkillsPicker
               skills={lookups.skills.data ?? []}
+              isLoading={lookups.skills.isLoading}
+              isError={lookups.skills.isError}
               selected={form.watch('requiredSkills') ?? []}
               onChange={(requiredSkills) => form.setValue('requiredSkills', requiredSkills, { shouldDirty: true, shouldValidate: true })}
             />
@@ -141,7 +145,7 @@ export function TaskFormPage() {
   )
 }
 
-function RequiredSkillsPicker({ skills, selected, onChange }: { skills: { id: string; name: string }[]; selected: RequiredSkillPayload[]; onChange: (value: RequiredSkillPayload[]) => void }) {
+function RequiredSkillsPicker({ skills, isLoading, isError, selected, onChange }: { skills: { id: string; name: string }[]; isLoading: boolean; isError: boolean; selected: RequiredSkillPayload[]; onChange: (value: RequiredSkillPayload[]) => void }) {
   const [skillId, setSkillId] = useState('')
   const [minimumLevel, setMinimumLevel] = useState<SkillLevel>('BEGINNER')
   const selectedIds = new Set(selected.map((item) => item.skillId))
@@ -149,8 +153,8 @@ function RequiredSkillsPicker({ skills, selected, onChange }: { skills: { id: st
   return (
     <div className="space-y-3 lg:col-span-2">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]">
-        <Select value={skillId} onValueChange={setSkillId}>
-          <SelectTrigger aria-label="Required skill"><SelectValue placeholder={available.length ? 'Choose required skill' : 'No more skills'} /></SelectTrigger>
+        <Select value={skillId} disabled={isError || available.length === 0} onValueChange={setSkillId}>
+          <SelectTrigger aria-label="Required skill"><SelectValue placeholder={isLoading ? 'Loading skills' : available.length ? 'Choose required skill' : 'No active skills'} /></SelectTrigger>
           <SelectContent>{available.map((skill) => <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={minimumLevel} onValueChange={(value) => setMinimumLevel(value as SkillLevel)}>
@@ -159,6 +163,8 @@ function RequiredSkillsPicker({ skills, selected, onChange }: { skills: { id: st
         </Select>
         <Button type="button" variant="outline" onClick={() => { if (skillId) { onChange([...selected, { skillId, minimumLevel }]); setSkillId('') } }}>Add skill</Button>
       </div>
+      {isError ? <p className="text-sm text-destructive">Skills could not be loaded. Required skills cannot be edited until the catalog loads.</p> : null}
+      {!isLoading && !isError && skills.length === 0 ? <p className="text-sm text-text-secondary">No active skills are available.</p> : null}
       <div className="flex flex-wrap gap-2">
         {selected.map((item) => {
           const skill = skills.find((candidate) => candidate.id === item.skillId)

@@ -78,6 +78,147 @@ public sealed class InfrastructureProviderTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Production_smoke_test_student_seeder_creates_expected_student_account()
+    {
+        await using var provider = CreateDevelopmentAdminSeedProvider();
+
+        await ProductionSmokeTestStudentSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"));
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var passwordService = scope.ServiceProvider.GetRequiredService<IdentityPasswordService>();
+        var user = await context.Users.Include(entity => entity.Role).Include(entity => entity.Student).SingleAsync(entity => entity.Email == ProductionSmokeTestStudentSeeder.Email);
+
+        Assert.True(user.IsActive);
+        Assert.Null(user.DeletedAt);
+        Assert.Equal("Test Student", user.DisplayName);
+        Assert.Equal(UserRole.STUDENT, user.Role?.Name);
+        Assert.True(passwordService.VerifyPassword(user, ProductionSmokeTestStudentSeeder.Password));
+        Assert.NotNull(user.Student);
+        Assert.Equal("Test", user.Student.FirstName);
+        Assert.Equal("Student", user.Student.LastName);
+        Assert.Equal("Computer Engineering", user.Student.Department);
+        Assert.Equal(600, user.Student.WeeklyTargetMinutes);
+        Assert.Null(user.Student.DeletedAt);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_smoke_test_student_seeder_is_idempotent_and_does_not_affect_dev_admin()
+    {
+        await using var provider = CreateDevelopmentAdminSeedProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var adminRole = new Role { Id = Guid.NewGuid(), Name = UserRole.ADMIN, Description = "Admin" };
+            context.Roles.Add(adminRole);
+            context.Users.Add(new User
+            {
+                Id = Guid.NewGuid(),
+                Email = "admin.dev@local.test",
+                DisplayName = "Development Admin",
+                IsActive = true,
+                RoleId = adminRole.Id,
+                Role = adminRole,
+                PasswordHash = "unchanged-admin-hash"
+            });
+            context.Users.Add(new User
+            {
+                Id = Guid.NewGuid(),
+                Email = ProductionSmokeTestStudentSeeder.Email,
+                DisplayName = "Existing Test Student",
+                IsActive = false,
+                RoleId = adminRole.Id,
+                Role = adminRole
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await ProductionSmokeTestStudentSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"));
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var existing = await context.Users.Include(entity => entity.Role).SingleAsync(entity => entity.Email == ProductionSmokeTestStudentSeeder.Email);
+            var admin = await context.Users.Include(entity => entity.Role).SingleAsync(entity => entity.Email == "admin.dev@local.test");
+
+            Assert.Equal("Existing Test Student", existing.DisplayName);
+            Assert.False(existing.IsActive);
+            Assert.Equal(UserRole.ADMIN, existing.Role?.Name);
+            Assert.Null(existing.PasswordHash);
+            Assert.Empty(await context.Students.Where(student => student.Email == ProductionSmokeTestStudentSeeder.Email).ToListAsync());
+            Assert.Equal("unchanged-admin-hash", admin.PasswordHash);
+            Assert.Equal(UserRole.ADMIN, admin.Role?.Name);
+        }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_smoke_test_student_cli_path_requires_production_environment()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ProductionSmokeTestStudentSeeder.RunCliAsync(configuration, new FakeHostEnvironment("Development")));
+
+        Assert.Contains("can only run", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Production_smoke_test_student_seed_switch_is_explicit()
+    {
+        Assert.False(ProductionSmokeTestStudentSeeder.ShouldRun([]));
+        Assert.False(ProductionSmokeTestStudentSeeder.ShouldRun(["--some-other-command"]));
+        Assert.True(ProductionSmokeTestStudentSeeder.ShouldRun([ProductionSmokeTestStudentSeeder.CommandName]));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_reference_data_seeder_creates_expected_values_and_is_idempotent()
+    {
+        await using var provider = CreateReferenceDataSeedProvider();
+
+        await ProductionReferenceDataSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"));
+        await ProductionReferenceDataSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"));
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        Assert.Equal(6, await context.Categories.CountAsync());
+        Assert.Equal(18, await context.Skills.CountAsync());
+        Assert.All(ProductionReferenceDataSeeder.CategoryNames, name => Assert.Contains(context.Categories, category => category.Name == name && category.IsActive));
+        Assert.All(ProductionReferenceDataSeeder.SkillNames, name => Assert.Contains(context.Skills, skill => skill.Name == name && skill.IsActive));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_reference_data_seeder_ignores_case_and_whitespace_duplicates()
+    {
+        await using var provider = CreateReferenceDataSeedProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.Categories.Add(new Category { Id = Guid.NewGuid(), Name = " administrative ", IsActive = true });
+            context.Skills.Add(new Skill { Id = Guid.NewGuid(), Name = " programming ", IsActive = true });
+            await context.SaveChangesAsync();
+        }
+
+        await ProductionReferenceDataSeeder.SeedAsync(provider, new FakeHostEnvironment("Production"));
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Assert.Equal(6, await context.Categories.CountAsync());
+            Assert.Equal(18, await context.Skills.CountAsync());
+        }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_reference_data_cli_requires_production_environment()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => ProductionReferenceDataSeeder.RunCliAsync(configuration, new FakeHostEnvironment("Development")));
+
+        Assert.Contains("can only run", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Infrastructure_production_requires_explicit_database_connection()
     {
         var configuration = new ConfigurationBuilder()
@@ -468,6 +609,15 @@ public sealed class InfrastructureProviderTests
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IdentityPasswordService>();
         services.AddScoped<StudentWorkforceManagement.Application.Auth.Services.IPasswordService>(serviceProvider => serviceProvider.GetRequiredService<IdentityPasswordService>());
+        return services.BuildServiceProvider();
+    }
+
+    private static ServiceProvider CreateReferenceDataSeedProvider()
+    {
+        var databaseName = Guid.NewGuid().ToString("N");
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<ApplicationDbContext>(options => options.UseInMemoryDatabase(databaseName));
         return services.BuildServiceProvider();
     }
 

@@ -192,8 +192,12 @@ public static class V1Endpoints
 
     private static void MapCatalog(RouteGroupBuilder api)
     {
-        api.MapGet("/skills", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSkillsQuery(), cancellationToken))).RequireAuthorization();
-        api.MapPost("/skills", async (CreateSkillCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/skills", await sender.Send(request, cancellationToken))).RequireAuthorization("ADMIN");
+        api.MapGet("/skills", async (bool? includeInactive, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSkillsQuery(includeInactive ?? false), cancellationToken))).RequireAuthorization().WithTags("Skills");
+        api.MapGet("/skills/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetSkillQuery(id), cancellationToken))).RequireAuthorization().WithTags("Skills");
+        api.MapPost("/skills", async (ReferenceDataRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/skills", await sender.Send(new CreateSkillCommand(request.Name, request.Description), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Skills");
+        api.MapPut("/skills/{id:guid}", async (Guid id, ReferenceDataRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateSkillCommand(id, request.Name, request.Description), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Skills");
+        api.MapPost("/skills/{id:guid}/deactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new DeactivateSkillCommand(id), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Skills");
+        api.MapPost("/skills/{id:guid}/reactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReactivateSkillCommand(id), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Skills");
         api.MapGet("/students/{studentId:guid}/skills", async (Guid studentId, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new GetStudentSkillsQuery(studentId), cancellationToken)))
             .RequireAuthorization()
@@ -202,8 +206,12 @@ public static class V1Endpoints
         api.MapPost("/students/{studentId:guid}/skills", async (Guid studentId, UpsertStudentSkillRequest request, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new UpsertStudentSkillCommand(studentId, request.SkillId, request.Level), cancellationToken))).RequireAuthorization();
 
-        api.MapGet("/categories", async (ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetCategoriesQuery(), cancellationToken))).RequireAuthorization();
-        api.MapPost("/categories", async (CreateCategoryCommand request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/categories", await sender.Send(request, cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+        api.MapGet("/categories", async (bool? includeInactive, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetCategoriesQuery(includeInactive ?? false), cancellationToken))).RequireAuthorization().WithTags("Categories");
+        api.MapGet("/categories/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new GetCategoryQuery(id), cancellationToken))).RequireAuthorization().WithTags("Categories");
+        api.MapPost("/categories", async (ReferenceDataRequest request, ISender sender, CancellationToken cancellationToken) => Results.Created("/api/v1/categories", await sender.Send(new CreateCategoryCommand(request.Name, request.Description), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Categories");
+        api.MapPut("/categories/{id:guid}", async (Guid id, ReferenceDataRequest request, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new UpdateCategoryCommand(id, request.Name, request.Description), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Categories");
+        api.MapPost("/categories/{id:guid}/deactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new DeactivateCategoryCommand(id), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Categories");
+        api.MapPost("/categories/{id:guid}/reactivate", async (Guid id, ISender sender, CancellationToken cancellationToken) => Results.Ok(await sender.Send(new ReactivateCategoryCommand(id), cancellationToken))).RequireAuthorization("ADMIN").WithTags("Categories");
     }
 
     private static void MapStudents(RouteGroupBuilder api)
@@ -634,6 +642,7 @@ public static class V1Endpoints
     public sealed record InviteRequest(string Email, DateTimeOffset ExpiresAt);
     public sealed record ResendInvitationRequest(DateTimeOffset ExpiresAt);
     public sealed record UpsertStudentSkillRequest(Guid SkillId, SkillLevel Level);
+    public sealed record ReferenceDataRequest(string Name, string? Description);
     public sealed record UpdateStudentRequest(string FirstName, string LastName, string Email, string Department, int? WeeklyTargetMinutes);
     public sealed record UpdateTaskRequest(string Title, string? Description, Guid CategoryId, Guid? SemesterId, TaskPriority Priority, TaskDifficulty Difficulty, DateTimeOffset? StartDate, DateTimeOffset Deadline, int EstimatedDurationMinutes, Guid ConcurrencyToken);
     public sealed record AssignTaskRequest(Guid StudentId, string? Reason, int? PlannedEffortMinutes);

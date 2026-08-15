@@ -9,6 +9,7 @@ using Npgsql;
 using StackExchange.Redis;
 using StudentWorkforceManagement.Infrastructure;
 using StudentWorkforceManagement.Infrastructure.Persistence;
+using StudentWorkforceManagement.Domain.Enums;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 
@@ -110,6 +111,81 @@ public sealed class InfrastructureContainerTests
         Assert.Same(multiplexer, provider.GetRequiredService<IConnectionMultiplexer>());
         Assert.True(await multiplexer.GetDatabase().KeyExistsAsync("StudentWorkforceManagement:DataProtectionKeys"));
         Assert.False(Directory.Exists(fileSystemKeyPath));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_smoke_test_student_cli_path_uses_only_database_configuration_and_is_idempotent()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .Build();
+        await postgres.StartAsync();
+
+        var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .Options;
+        await using (var context = new ApplicationDbContext(dbOptions))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DATABASE_CONNECTION_STRING"] = postgres.GetConnectionString()
+            })
+            .Build();
+        var environment = new FakeHostEnvironment("Production");
+
+        await ProductionSmokeTestStudentSeeder.RunCliAsync(configuration, environment);
+        await ProductionSmokeTestStudentSeeder.RunCliAsync(configuration, environment);
+
+        await using var verificationContext = new ApplicationDbContext(dbOptions);
+        var user = await verificationContext.Users
+            .Include(entity => entity.Role)
+            .Include(entity => entity.Student)
+            .SingleAsync(entity => entity.Email == ProductionSmokeTestStudentSeeder.Email);
+
+        Assert.True(user.IsActive);
+        Assert.Equal(UserRole.STUDENT, user.Role?.Name);
+        Assert.NotNull(user.PasswordHash);
+        Assert.NotEqual(ProductionSmokeTestStudentSeeder.Password, user.PasswordHash);
+        Assert.NotNull(user.Student);
+        Assert.Equal("Test", user.Student.FirstName);
+        Assert.Equal("Student", user.Student.LastName);
+        Assert.Equal("Computer Engineering", user.Student.Department);
+        Assert.Equal(600, user.Student.WeeklyTargetMinutes);
+        Assert.Equal(1, await verificationContext.Users.IgnoreQueryFilters().CountAsync(entity => entity.Email == ProductionSmokeTestStudentSeeder.Email));
+        Assert.Equal(1, await verificationContext.Students.IgnoreQueryFilters().CountAsync(entity => entity.Email == ProductionSmokeTestStudentSeeder.Email));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Production_reference_data_cli_path_uses_only_database_configuration()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .Build();
+        await postgres.StartAsync();
+
+        var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .Options;
+        await using (var context = new ApplicationDbContext(dbOptions))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DATABASE_CONNECTION_STRING"] = postgres.GetConnectionString()
+            })
+            .Build();
+
+        await ProductionReferenceDataSeeder.RunCliAsync(configuration, new FakeHostEnvironment("Production"));
+        await ProductionReferenceDataSeeder.RunCliAsync(configuration, new FakeHostEnvironment("Production"));
+
+        await using var verificationContext = new ApplicationDbContext(dbOptions);
+        Assert.Equal(6, await verificationContext.Categories.CountAsync());
+        Assert.Equal(18, await verificationContext.Skills.CountAsync());
     }
 
     private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment

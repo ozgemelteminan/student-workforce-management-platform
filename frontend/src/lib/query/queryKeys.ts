@@ -70,9 +70,11 @@ export const queryKeys = {
   },
   categories: {
     all: ['categories'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.categories.all, 'list', filters] as const,
   },
   skills: {
     all: ['skills'] as const,
+    list: (filters: Record<string, unknown> = {}) => [...queryKeys.skills.all, 'list', filters] as const,
   },
   marketplace: {
     all: ['marketplace'] as const,

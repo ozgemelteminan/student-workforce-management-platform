@@ -39,6 +39,14 @@ Apply migrations before serving traffic:
 dotnet ef database update --project backend/src/StudentWorkforceManagement.Infrastructure --startup-project backend/src/StudentWorkforceManagement.Api
 ```
 
+Seed initial production Categories and Skills once after migrations:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Production DOTNET_ENVIRONMENT=Production DATABASE_CONNECTION_STRING='<production PostgreSQL connection string>' dotnet run --no-launch-profile --project backend/src/StudentWorkforceManagement.Api/StudentWorkforceManagement.Api.csproj -- --seed-production-reference-data
+```
+
+The reference-data seed is idempotent and creates only Category and Skill master records.
+
 ## Verification
 
 Before release, run:

@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Interfaces;
 using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Tasks.DTOs;
@@ -22,6 +24,11 @@ public sealed class TaskCreationService(IApplicationDbContext dbContext, IAuditS
         Guid createdById,
         CancellationToken cancellationToken = default)
     {
+        if (!await dbContext.Categories.AnyAsync(category => category.Id == categoryId && category.IsActive, cancellationToken))
+        {
+            throw new ConflictException("Inactive or missing categories cannot be selected.");
+        }
+
         var task = new DomainTask
         {
             Id = Guid.NewGuid(),

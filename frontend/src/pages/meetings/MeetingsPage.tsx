@@ -1,5 +1,6 @@
 import { CalendarCheck, Plus, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Textarea } from '../../components/ui'
 import { useCollaborationMutations, useMeeting, useMeetings, useMeetingSlots } from '../../features/collaboration/useCollaborationQueries'
 import { useTaskLookups } from '../../features/tasks/useTaskQueries'
@@ -10,11 +11,13 @@ import type { CampusPresence, MeetingStatus, MeetingType } from '../../features/
 const meetingStatuses: MeetingStatus[] = ['DRAFT', 'AVAILABILITY_REQUESTED', 'CONFIRMED', 'CANCELLED']
 
 export function MeetingsPage() {
+  const { meetingId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const roles = user?.roles ?? []
   const staff = roles.includes('ADMIN') || roles.includes('TASK_MANAGER')
   const [status, setStatus] = useState<MeetingStatus | 'ALL'>('ALL')
-  const [selectedId, setSelectedId] = useState<string>()
+  const [selectedId, setSelectedId] = useState<string | undefined>(meetingId)
   const meetings = useMeetings({ page: 1, pageSize: 30, status: status === 'ALL' ? undefined : status })
   const selected = useMeeting(selectedId)
   const slots = useMeetingSlots(selectedId, Boolean(selectedId && staff))
@@ -23,6 +26,15 @@ export function MeetingsPage() {
   const [create, setCreate] = useState({ title: '', type: 'IN_PERSON' as MeetingType, responseDeadline: '', participantStudentIds: [] as string[], location: '', agenda: '' })
   const [response, setResponse] = useState({ campusPresence: 'UNSURE' as CampusPresence, startAt: '', endAt: '', note: '' })
   const [actionItem, setActionItem] = useState('')
+
+  useEffect(() => {
+    setSelectedId(meetingId)
+  }, [meetingId])
+
+  const selectMeeting = (id: string) => {
+    setSelectedId(id)
+    navigate(`/meetings/${id}`)
+  }
 
   return (
     <div className="space-y-5">
@@ -38,7 +50,7 @@ export function MeetingsPage() {
             {meetings.isLoading ? <Skeleton className="h-56" /> : null}
             <div className="divide-y divide-border rounded-lg border border-border">
               {meetings.data?.items.map((meeting) => (
-                <button key={meeting.id} type="button" className="block w-full px-3 py-3 text-left text-sm transition hover:bg-surface-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" onClick={() => setSelectedId(meeting.id)}>
+                <button key={meeting.id} type="button" className="block w-full px-3 py-3 text-left text-sm transition hover:bg-surface-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" onClick={() => selectMeeting(meeting.id)}>
                   <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{meeting.title}</span><Badge>{meeting.status}</Badge><Badge variant="info">{meeting.type}</Badge></span>
                   <span className="mt-1 block text-text-secondary">Respond by {formatIstanbulDateTime(meeting.responseDeadline)} · {meeting.participants.length} participants</span>
                 </button>
@@ -79,7 +91,7 @@ export function MeetingsPage() {
                     <Button type="submit" className="md:col-span-3" isLoading={mutations.respondMeeting.isPending}>Submit availability</Button>
                   </form>
                   {staff ? <div className="space-y-2"><h3 className="text-sm font-semibold">Recommended slots</h3>{slots.data?.map((slot) => <div key={`${slot.startAt}-${slot.endAt}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3 text-sm"><span>{formatIstanbulDateTime(slot.startAt)} - {formatIstanbulDateTime(slot.endAt)} · {slot.availableCount}/{slot.participantCount} available</span><Button size="sm" variant="outline" onClick={() => mutations.confirmMeeting.mutate({ id: selected.data.id, startAt: slot.startAt, endAt: slot.endAt, location: selected.data.location })}>Confirm</Button></div>)}</div> : null}
-                  <div className="space-y-2"><h3 className="text-sm font-semibold">Action items</h3>{selected.data.actionItems.map((item) => <div key={item.id} className="rounded-md border border-border p-3 text-sm"><p className="font-medium">{item.title}</p><p className="text-text-secondary">{item.taskId ? `Task ${item.taskId.slice(0, 8)}` : 'No task created'}</p></div>)}{staff ? <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (actionItem.trim()) void mutations.addActionItem.mutateAsync({ id: selected.data.id, title: actionItem }).then(() => setActionItem('')) }}><Input aria-label="Action item title" value={actionItem} onChange={(event) => setActionItem(event.target.value)} /><Button type="submit">Add</Button></form> : null}</div>
+                  <div className="space-y-2"><h3 className="text-sm font-semibold">Action items</h3>{selected.data.actionItems.map((item) => <div key={item.id} className="rounded-md border border-border p-3 text-sm"><p className="font-medium">{item.title}</p><p className="text-text-secondary">{item.taskId ? `Linked task ${item.taskId.slice(0, 8)}` : 'No task created'}</p></div>)}{staff ? <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (actionItem.trim()) void mutations.addActionItem.mutateAsync({ id: selected.data.id, title: actionItem }).then(() => setActionItem('')) }}><Input aria-label="Action item title" value={actionItem} onChange={(event) => setActionItem(event.target.value)} /><Button type="submit">Add</Button></form> : null}</div>
                 </div>
               ) : null}
             </CardContent>

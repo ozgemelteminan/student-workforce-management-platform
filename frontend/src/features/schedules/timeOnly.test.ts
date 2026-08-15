@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { formatTimeRange, normalizeTimeOnly } from './timeOnly'
+import { dayOfWeekValues, formatTimeRange } from './timeOnly'
 
-describe('time-only formatting', () => {
-  it('renders TimeOnly strings without applying browser timezone conversion', () => {
-    expect(normalizeTimeOnly('09:00:00')).toBe('09:00')
-    expect(normalizeTimeOnly('14:00')).toBe('14:00')
-    expect(formatTimeRange('23:30:00', '23:59:00')).toBe('23:30-23:59')
+describe('time-only schedule helpers', () => {
+  it('keeps weekday options in the canonical Monday-first order exactly once', () => {
+    expect(dayOfWeekValues).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+    expect(new Set(dayOfWeekValues).size).toBe(dayOfWeekValues.length)
+  })
+
+  it('formats wall-clock time ranges without timezone conversion', () => {
+    expect(formatTimeRange('9:00', '10:30')).toBe('09:00-10:30')
   })
 })

@@ -15,6 +15,7 @@ export type TimesheetEntry = {
   minutes: number
   note?: string
   concurrencyToken: string
+  taskTitle?: string
 }
 
 export type TimesheetWeek = {

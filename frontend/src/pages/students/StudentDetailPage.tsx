@@ -64,7 +64,7 @@ export function StudentDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Metric label="Active tasks" value={profile.data?.activeTaskCount} />
         <Metric label="Completed tasks" value={profile.data?.completedTaskCount} />
-        <Metric label="Derived workload" value={profile.data ? formatDuration(profile.data.currentWorkloadMinutes) : undefined} />
+        <Metric label="Active task workload" value={profile.data ? formatDuration(profile.data.currentWorkloadMinutes) : undefined} />
         <Metric label="Weekly target" value={student ? formatWeeklyTarget(student.weeklyTargetMinutes) : undefined} />
       </div>
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">

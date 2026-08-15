@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '../../../lib/api'
-import { confirmMeeting, createMeeting, createUnavailability, getCurrentTimesheet, getMeetingSlots, getMeetings, getTimesheets, respondToMeeting, reviewTimesheet, submitTimesheet, upsertTimesheetEntry } from './collaborationApi'
+import { confirmMeeting, createMeeting, createUnavailability, getCurrentTimesheet, getMeeting, getMeetingSlots, getMeetings, getTimesheets, respondToMeeting, reviewTimesheet, submitTimesheet, upsertTimesheetEntry } from './collaborationApi'
 
 vi.mock('../../../lib/api', () => ({
   apiRequest: vi.fn(),
@@ -33,6 +33,7 @@ describe('collaboration API client', () => {
   it('calls unavailability and meeting coordination endpoints without frontend persistence', async () => {
     await createUnavailability({ startAt: '2026-08-10T09:00:00Z', endAt: '2026-08-10T12:00:00Z', category: 'Exam' })
     await getMeetings({ page: 1, pageSize: 10, status: 'AVAILABILITY_REQUESTED' })
+    await getMeeting('meeting-1')
     await createMeeting({ title: 'Planning', type: 'IN_PERSON', responseDeadline: '2026-08-11T09:00:00Z', participantStudentIds: ['student-1'], location: 'Campus' })
     await respondToMeeting('meeting-1', { campusPresence: 'ON_CAMPUS', availableRangesJson: '[]' })
     await getMeetingSlots('meeting-1')
@@ -40,9 +41,10 @@ describe('collaboration API client', () => {
 
     expect(mockedApiRequest).toHaveBeenNthCalledWith(1, '/unavailability', { method: 'POST', body: { startAt: '2026-08-10T09:00:00Z', endAt: '2026-08-10T12:00:00Z', category: 'Exam' } })
     expect(mockedApiRequest).toHaveBeenNthCalledWith(2, '/meetings?page=1&pageSize=10&status=AVAILABILITY_REQUESTED', { signal: undefined })
-    expect(mockedApiRequest).toHaveBeenNthCalledWith(3, '/meetings', { method: 'POST', body: { title: 'Planning', type: 'IN_PERSON', responseDeadline: '2026-08-11T09:00:00Z', participantStudentIds: ['student-1'], location: 'Campus' } })
-    expect(mockedApiRequest).toHaveBeenNthCalledWith(4, '/meetings/meeting-1/response', { method: 'POST', body: { campusPresence: 'ON_CAMPUS', availableRangesJson: '[]' } })
-    expect(mockedApiRequest).toHaveBeenNthCalledWith(5, '/meetings/meeting-1/slot-recommendations', { signal: undefined })
-    expect(mockedApiRequest).toHaveBeenNthCalledWith(6, '/meetings/meeting-1/confirm', { method: 'POST', body: { startAt: '2026-08-11T10:00:00Z', endAt: '2026-08-11T11:00:00Z' } })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(3, '/meetings/meeting-1', { signal: undefined })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(4, '/meetings', { method: 'POST', body: { title: 'Planning', type: 'IN_PERSON', responseDeadline: '2026-08-11T09:00:00Z', participantStudentIds: ['student-1'], location: 'Campus' } })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(5, '/meetings/meeting-1/response', { method: 'POST', body: { campusPresence: 'ON_CAMPUS', availableRangesJson: '[]' } })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(6, '/meetings/meeting-1/slot-recommendations', { signal: undefined })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(7, '/meetings/meeting-1/confirm', { method: 'POST', body: { startAt: '2026-08-11T10:00:00Z', endAt: '2026-08-11T11:00:00Z' } })
   })
 })

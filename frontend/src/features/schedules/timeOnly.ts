@@ -1,4 +1,4 @@
-export const dayOfWeekValues = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
+export const dayOfWeekValues = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 export const availabilityStatuses = ['AVAILABLE', 'UNAVAILABLE', 'PREFERRED'] as const
 
 export function normalizeTimeOnly(value: string): string {

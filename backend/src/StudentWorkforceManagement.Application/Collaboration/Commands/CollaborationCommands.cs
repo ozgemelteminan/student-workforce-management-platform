@@ -394,7 +394,7 @@ public sealed class CollaborationCommandHandler(
             .Select(week => new TimesheetWeekDto(
                 week.Id, week.StudentId, week.WeekStartDate, week.WeekEndDate, week.TargetMinutes, week.Status, week.Entries.Sum(entry => entry.Minutes),
                 week.SubmittedAt, week.ReviewedAt, week.ReviewedByUserId, week.ReviewerComment, week.ConcurrencyToken,
-                week.Entries.OrderBy(entry => entry.WorkDate).Select(entry => new TimesheetEntryDto(entry.Id, entry.TimesheetWeekId, entry.TaskId, entry.WorkDate, entry.Minutes, entry.Note, entry.ConcurrencyToken)).ToList()))
+                week.Entries.OrderBy(entry => entry.WorkDate).Select(entry => new TimesheetEntryDto(entry.Id, entry.TimesheetWeekId, entry.TaskId, entry.WorkDate, entry.Minutes, entry.Note, entry.ConcurrencyToken, entry.Task != null ? entry.Task.Title : null)).ToList()))
             .SingleAsync(cancellationToken);
     }
 

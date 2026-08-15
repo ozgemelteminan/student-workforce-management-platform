@@ -24,7 +24,13 @@ const schema = z.object({
   deadline: z.string().min(1, 'Deadline is required.'),
   estimatedDurationMinutes: z.coerce.number().int().positive('Estimate must be greater than 0.'),
   requiredSkills: z.array(z.object({ skillId: z.string().uuid(), minimumLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']) })).optional(),
-}).refine((value) => !value.startDate || new Date(toUtc(value.deadline)).getTime() > new Date(toUtc(value.startDate)).getTime(), { path: ['deadline'], message: 'Deadline must be after start date.' })
+}).refine((value) => {
+  if (!value.startDate || !value.deadline) return true
+  const deadline = toUtcSafe(value.deadline)
+  const startDate = toUtcSafe(value.startDate)
+  if (!deadline || !startDate) return true
+  return new Date(deadline).getTime() > new Date(startDate).getTime()
+}, { path: ['deadline'], message: 'Deadline must be after start date.' })
 
 type FormValues = z.infer<typeof schema>
 
@@ -198,6 +204,14 @@ async function syncRequiredSkills(taskId: string, existing: RequiredSkillPayload
 
 function toUtc(value: string) {
   return fromZonedTime(value, DISPLAY_TIME_ZONE).toISOString()
+}
+
+function toUtcSafe(value: string) {
+  try {
+    return toUtc(value)
+  } catch {
+    return null
+  }
 }
 
 function toLocalInput(value: string) {

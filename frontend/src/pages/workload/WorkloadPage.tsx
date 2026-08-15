@@ -48,7 +48,7 @@ export function WorkloadPage() {
                     <div className="divide-y divide-border rounded-lg border border-border">
                       {currentWeek.data.entries.map((item) => (
                         <div key={item.id} className="grid gap-2 px-3 py-2 text-sm md:grid-cols-[1fr_auto] md:items-center">
-                          <div><p className="font-medium">{formatDateOnly(item.workDate)} · {item.minutes} min</p><p className="text-text-secondary">Task {item.taskId.slice(0, 8)}{item.note ? ` · ${item.note}` : ''}</p></div>
+                          <div><p className="font-medium">{formatDateOnly(item.workDate)} · {item.minutes} min</p><p className="text-text-secondary">{item.taskTitle ?? `Task ${item.taskId.slice(0, 8)}`}{item.note ? ` · ${item.note}` : ''}</p></div>
                           {currentWeek.data.status === 'DRAFT' || currentWeek.data.status === 'NEEDS_CORRECTION' ? <Button variant="ghost" size="sm" onClick={() => mutations.deleteEntry.mutate(item.id)}>Remove</Button> : null}
                         </div>
                       ))}

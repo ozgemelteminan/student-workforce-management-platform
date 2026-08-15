@@ -6,13 +6,14 @@ import type { RequestFilters, RequestStatus, RequestType, TaskRequest } from '..
 import { useRequestMutations, useRequests } from '../../features/requests/useRequestQueries'
 import { useStudents } from '../../features/students/useStudentQueries'
 import { TaskDeadline } from '../../features/tasks/components'
-import type { Task } from '../../features/tasks/types'
+import type { Task, TaskStatus } from '../../features/tasks/types'
 import { useMyTasks } from '../../features/tasks/useTaskQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
 const requestTypes: RequestType[] = ['EXTENSION', 'REASSIGNMENT']
 const requestStatuses: RequestStatus[] = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']
+const requestEligibleTaskStatuses: TaskStatus[] = ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'OVERDUE']
 
 export function RequestsPage() {
   const { user } = useAuth()
@@ -81,6 +82,7 @@ export function RequestsPage() {
 
 function RequestCreateForm({ tasks }: { tasks: Task[] }) {
   const mutations = useRequestMutations()
+  const eligibleTasks = tasks.filter((task) => requestEligibleTaskStatuses.includes(task.status))
   const [type, setType] = useState<RequestType>('EXTENSION')
   const [taskId, setTaskId] = useState('')
   const [requestedDeadline, setRequestedDeadline] = useState('')
@@ -96,11 +98,12 @@ function RequestCreateForm({ tasks }: { tasks: Task[] }) {
       mutations.createReassignment.mutate({ taskId, reason, suggestedStudentId: suggestedStudentId || undefined })
     }
   }
-  const selectedTask = tasks.find((task) => task.id === taskId)
+  const selectedTask = eligibleTasks.find((task) => task.id === taskId)
   return (
     <form className="space-y-3" onSubmit={submit}>
       <FormField label="Request type">{({ id }) => <Select value={type} onValueChange={(value) => setType(value as RequestType)}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>}</FormField>
-      <FormField label="Task">{({ id }) => <Select value={taskId} onValueChange={setTaskId}><SelectTrigger id={id}><SelectValue placeholder="Select assigned task" /></SelectTrigger><SelectContent>{tasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}</SelectContent></Select>}</FormField>
+      <FormField label="Task">{({ id }) => <Select value={taskId} disabled={eligibleTasks.length === 0} onValueChange={setTaskId}><SelectTrigger id={id}><SelectValue placeholder="Select assigned task" /></SelectTrigger><SelectContent>{eligibleTasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}</SelectContent></Select>}</FormField>
+      {eligibleTasks.length === 0 ? <p className="text-sm text-text-secondary">No active assigned tasks can receive new requests.</p> : null}
       {selectedTask ? <p className="text-xs text-text-secondary">Current deadline: <TaskDeadline task={selectedTask} compact /></p> : null}
       {type === 'EXTENSION' ? <FormField label="Requested deadline" required>{({ id }) => <Input id={id} type="datetime-local" value={requestedDeadline} onChange={(event) => setRequestedDeadline(event.target.value)} />}</FormField> : null}
       {type === 'REASSIGNMENT' ? <FormField label="Suggested student ID" helperText="Optional. The current API accepts only an ID here.">{({ id }) => <Input id={id} value={suggestedStudentId} onChange={(event) => setSuggestedStudentId(event.target.value)} />}</FormField> : null}

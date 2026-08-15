@@ -125,6 +125,24 @@ public sealed class ApplicationWorkflowTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Completed_or_terminal_tasks_reject_new_student_requests()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var completed = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.COMPLETED);
+        var cancelled = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.CANCELLED);
+        var active = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.IN_PROGRESS);
+        await context.SaveChangesAsync();
+        var handler = new CreateTaskRequestCommandHandler(context, new FakeCurrentUser(Guid.NewGuid(), student.Id, UserRole.STUDENT));
+
+        await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new CreateExtensionRequestCommand(completed.Id, completed.Deadline.AddDays(1), "Already done"), CancellationToken.None));
+        await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new CreateReassignmentRequestCommand(cancelled.Id, "No longer active"), CancellationToken.None));
+
+        var created = await handler.Handle(new CreateReassignmentRequestCommand(active.Id, "Active task can still be reassigned"), CancellationToken.None);
+        Assert.Equal(RequestType.REASSIGNMENT, created.Type);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Request_queue_returns_human_readable_task_and_student_labels()
     {
         await using var context = CreateContext();
@@ -510,6 +528,24 @@ public sealed class ApplicationWorkflowTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Timesheet_entries_include_task_title_for_readable_workload_display()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        student.WeeklyTargetMinutes = 600;
+        var task = SeedTask(context, "Transcript Review", assignedStudentId: student.Id, status: TaskStatus.IN_PROGRESS);
+        context.TaskAssignmentHistory.Add(new TaskAssignmentHistory { Id = Guid.NewGuid(), TaskId = task.Id, StudentId = student.Id, AssignedByUserId = Guid.NewGuid(), AssignedAt = DateTimeOffset.UtcNow, Status = AssignmentStatus.ACTIVE, Mode = AssignmentMode.MANUAL, IsActive = true });
+        await context.SaveChangesAsync();
+        var currentUser = new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT);
+        var commandHandler = CreateCollaborationCommandHandler(context, currentUser, new FakeClock(new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero)));
+
+        await commandHandler.Handle(new UpsertTimesheetEntryCommand(null, task.Id, new DateOnly(2026, 8, 10), 30, null), CancellationToken.None);
+        var week = await new CollaborationQueryHandler(context, currentUser, new FakeClock(new DateTimeOffset(2026, 8, 12, 9, 0, 0, TimeSpan.Zero))).Handle(new GetCurrentTimesheetWeekQuery(), CancellationToken.None);
+
+        Assert.Equal("Transcript Review", Assert.Single(week.Entries).TaskTitle);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Recommendations_use_each_student_target_and_mark_missing_target_as_not_configured()
     {
         await using var context = CreateContext();
@@ -552,6 +588,27 @@ public sealed class ApplicationWorkflowTests
         Assert.Equal(2, best.AvailableCount);
         Assert.Equal(2, best.ParticipantCount);
         Assert.Equal(new DateTimeOffset(2026, 8, 10, 10, 0, 0, TimeSpan.Zero), best.StartAt);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Meeting_response_requires_invited_student_and_detail_includes_action_items_for_attendee()
+    {
+        await using var context = CreateContext();
+        var attendee = SeedStudent(context);
+        var outsider = SeedStudent(context);
+        await context.SaveChangesAsync();
+        var staff = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER);
+        var commandHandler = CreateCollaborationCommandHandler(context, staff);
+        var meeting = await commandHandler.Handle(new CreateMeetingCommand("Action planning", MeetingType.IN_PERSON, DateTimeOffset.UtcNow.AddDays(1), new[] { attendee.Id }, "Campus", null), CancellationToken.None);
+        await commandHandler.Handle(new AddMeetingActionItemCommand(meeting.Id, "Bring intake list", attendee.Id), CancellationToken.None);
+
+        await Assert.ThrowsAsync<ForbiddenException>(() => CreateCollaborationCommandHandler(context, new FakeCurrentUser(outsider.UserId, outsider.Id, UserRole.STUDENT)).Handle(new RespondToMeetingCommand(meeting.Id, CampusPresence.ON_CAMPUS, "[]", null), CancellationToken.None));
+
+        var updated = await CreateCollaborationCommandHandler(context, new FakeCurrentUser(attendee.UserId, attendee.Id, UserRole.STUDENT)).Handle(new RespondToMeetingCommand(meeting.Id, CampusPresence.ON_CAMPUS, """[{"startAt":"2026-08-10T10:00:00Z","endAt":"2026-08-10T11:00:00Z"}]""", null), CancellationToken.None);
+        var detail = await new CollaborationQueryHandler(context, new FakeCurrentUser(attendee.UserId, attendee.Id, UserRole.STUDENT), new FakeClock()).Handle(new GetMeetingQuery(meeting.Id), CancellationToken.None);
+
+        Assert.Equal(CampusPresence.ON_CAMPUS, updated.Participants.Single().CampusPresence);
+        Assert.Equal("Bring intake list", Assert.Single(detail.ActionItems).Title);
     }
 
     private static ApplicationDbContext CreateContext()

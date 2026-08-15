@@ -14,7 +14,7 @@ export function getNotificationRoute(notification: Notification): string | null 
     case 'announcement':
       return `/announcements/${notification.relatedEntityId}`
     case 'meeting':
-      return '/meetings'
+      return `/meetings/${notification.relatedEntityId}`
     case 'timesheet':
       return '/workload'
     default:

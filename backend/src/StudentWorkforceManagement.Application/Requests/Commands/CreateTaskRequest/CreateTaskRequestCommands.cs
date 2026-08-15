@@ -40,6 +40,7 @@ using TaskRequiredSkill = StudentWorkforceManagement.Domain.Entities.TaskRequire
 using TaskTemplate = StudentWorkforceManagement.Domain.Entities.TaskTemplate;
 using User = StudentWorkforceManagement.Domain.Entities.User;
 using StudentWorkforceManagement.Domain.Enums;
+using DomainTaskStatus = StudentWorkforceManagement.Domain.Enums.TaskStatus;
 
 namespace StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
 
@@ -83,6 +84,7 @@ public sealed class CreateTaskRequestCommandHandler(IApplicationDbContext dbCont
         {
             throw new ForbiddenException("Students may request extensions only for their assigned tasks.");
         }
+        EnsureTaskCanReceiveRequests(task.Status);
         if (request.RequestedDeadline <= task.Deadline)
         {
             throw new ConflictException("Requested deadline must be later than the current deadline.");
@@ -114,6 +116,7 @@ public sealed class CreateTaskRequestCommandHandler(IApplicationDbContext dbCont
         {
             throw new ForbiddenException("Students may request reassignment only for their assigned tasks.");
         }
+        EnsureTaskCanReceiveRequests(task.Status);
         await EnsureNoPendingRequestAsync(request.TaskId, RequestType.REASSIGNMENT, cancellationToken);
 
         var entity = new TaskRequest
@@ -136,6 +139,14 @@ public sealed class CreateTaskRequestCommandHandler(IApplicationDbContext dbCont
         if (await dbContext.TaskRequests.AnyAsync(entity => entity.TaskId == taskId && entity.Type == type && entity.Status == RequestStatus.PENDING, cancellationToken))
         {
             throw new ConflictException($"A pending {type} request already exists for this task.");
+        }
+    }
+
+    private static void EnsureTaskCanReceiveRequests(DomainTaskStatus status)
+    {
+        if (status is DomainTaskStatus.COMPLETED or DomainTaskStatus.INCOMPLETE or DomainTaskStatus.CANNOT_COMPLETE or DomainTaskStatus.CANCELLED)
+        {
+            throw new ConflictException("Completed or terminal tasks cannot receive new requests.");
         }
     }
 }

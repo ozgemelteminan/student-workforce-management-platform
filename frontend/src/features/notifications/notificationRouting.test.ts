@@ -19,6 +19,7 @@ describe('notification routing', () => {
   it('maps known structured entities to internal routes', () => {
     expect(getNotificationRoute({ ...baseNotification, relatedEntityType: 'Task', relatedEntityId: 'task-id' })).toBe('/tasks/task-id')
     expect(getNotificationRoute({ ...baseNotification, relatedEntityType: 'Announcement', relatedEntityId: 'announcement-id' })).toBe('/announcements/announcement-id')
+    expect(getNotificationRoute({ ...baseNotification, relatedEntityType: 'Meeting', relatedEntityId: 'meeting-id' })).toBe('/meetings/meeting-id')
   })
 
   it('does not invent routes for unsupported metadata', () => {

@@ -7,6 +7,8 @@ import { formatDuration } from '../../features/tasks/taskPresentation'
 import type { Feedback, SkillLevel, Student, StudentSkillDetail, Task } from '../../features/students/types'
 import { useSkillCatalog, useStudent, useStudentFeedback, useStudentMutations, useStudentSkills } from '../../features/students/useStudentQueries'
 import { useTasks } from '../../features/tasks/useTaskQueries'
+import { CourseWeeklyTimetable } from '../../features/schedules/components/CourseWeeklyTimetable'
+import { useScheduleCollections } from '../../features/schedules/useScheduleQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
@@ -20,6 +22,7 @@ export function StudentDetailPage() {
   const feedback = useStudentFeedback(studentId)
   const studentSkills = useStudentSkills(studentId)
   const tasks = useTasks({ page: 1, pageSize: 10, studentId, sortBy: 'deadline', sortDirection: 'asc' }, Boolean(studentId))
+  const schedule = useScheduleCollections(studentId, undefined, true)
   const skills = useSkillCatalog()
   const mutations = useStudentMutations(studentId)
   const [editOpen, setEditOpen] = useState(false)
@@ -67,6 +70,15 @@ export function StudentDetailPage() {
         <Metric label="Active task workload" value={profile.data ? formatDuration(profile.data.currentWorkloadMinutes) : undefined} />
         <Metric label="Weekly target" value={student ? formatWeeklyTarget(student.weeklyTargetMinutes) : undefined} />
       </div>
+      {studentId ? (
+        <CourseWeeklyTimetable
+          schedule={schedule.schedule.data ?? []}
+          isLoading={schedule.schedule.isLoading}
+          isError={schedule.schedule.isError}
+          emptyAudience="staff"
+          onRetry={() => void schedule.schedule.refetch()}
+        />
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader><h2 className="text-sm font-semibold">Task context</h2></CardHeader>

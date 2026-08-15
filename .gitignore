@@ -42,3 +42,4 @@ temp/
 # Development-only email sink artifacts
 storage/dev-emails/
 **/storage/dev-emails/
+render.env

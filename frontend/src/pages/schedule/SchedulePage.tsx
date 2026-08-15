@@ -5,6 +5,7 @@ import { useCurrentStudent, useStudents } from '../../features/students/useStude
 import { availabilityStatuses, dayOfWeekValues, formatTimeRange, isValidTimeRange } from '../../features/schedules/timeOnly'
 import type { Availability, AvailabilityStatus, CourseSchedule, DayOfWeek } from '../../features/schedules/types'
 import { useActiveSemester, useScheduleCollections, useScheduleMutations, useSemesters } from '../../features/schedules/useScheduleQueries'
+import { CourseWeeklyTimetable } from '../../features/schedules/components/CourseWeeklyTimetable'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatDateOnly } from '../../lib/date-time'
 
@@ -65,10 +66,12 @@ export function SchedulePage() {
       </Card>
       {!studentId ? <p className="rounded-lg border border-border bg-surface p-6 text-sm text-text-secondary">Select a student to view schedule and availability.</p> : null}
       {studentId ? (
-        <WeeklyTimetable
+        <CourseWeeklyTimetable
           schedule={collections.schedule.data ?? []}
-          availability={collections.availability.data ?? []}
-          isLoading={collections.schedule.isLoading || collections.availability.isLoading}
+          isLoading={collections.schedule.isLoading}
+          isError={collections.schedule.isError}
+          emptyAudience={isStudent ? 'student' : 'staff'}
+          onRetry={() => void collections.schedule.refetch()}
         />
       ) : null}
       <div className="grid gap-4 xl:grid-cols-2">
@@ -105,45 +108,6 @@ export function SchedulePage() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  )
-}
-
-function WeeklyTimetable({ schedule, availability, isLoading }: { schedule: CourseSchedule[]; availability: Availability[]; isLoading: boolean }) {
-  if (isLoading) {
-    return <Card><CardContent><p className="text-sm text-text-secondary">Loading weekly timetable.</p></CardContent></Card>
-  }
-
-  return (
-    <Card>
-      <CardHeader><h2 className="text-sm font-semibold">Weekly timetable</h2></CardHeader>
-      <CardContent>
-        <div className="grid gap-3 lg:grid-cols-7">
-          {dayOfWeekValues.map((day) => {
-            const courses = schedule.filter((item) => item.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime))
-            const windows = availability.filter((item) => item.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime))
-            return (
-              <section key={day} className="min-h-36 rounded-md border border-border bg-surface-secondary p-3">
-                <h3 className="text-xs font-semibold uppercase text-text-muted">{day}</h3>
-                <div className="mt-3 space-y-2">
-                  {courses.map((item) => <TimetableItem key={`course-${item.id}`} label={item.courseCode} detail={`${formatTimeRange(item.startTime, item.endTime)}${item.location ? ` · ${item.location}` : ''}`} variant="course" />)}
-                  {windows.map((item) => <TimetableItem key={`availability-${item.id}`} label={item.status} detail={`${formatTimeRange(item.startTime, item.endTime)}${item.reason ? ` · ${item.reason}` : ''}`} variant="availability" />)}
-                  {courses.length === 0 && windows.length === 0 ? <p className="text-xs text-text-muted">No entries</p> : null}
-                </div>
-              </section>
-            )
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function TimetableItem({ label, detail, variant }: { label: string; detail: string; variant: 'course' | 'availability' }) {
-  return (
-    <div className={`rounded border px-2 py-1.5 text-xs ${variant === 'course' ? 'border-brand/30 bg-brand/10 text-text-primary' : 'border-info/30 bg-info/10 text-text-primary'}`}>
-      <p className="font-medium">{label}</p>
-      <p className="mt-0.5 text-text-secondary">{detail}</p>
     </div>
   )
 }

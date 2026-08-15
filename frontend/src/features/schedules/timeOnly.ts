@@ -19,3 +19,13 @@ export function isValidTimeRange(startTime: string, endTime: string): boolean {
   const end = normalizeTimeOnly(endTime)
   return /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end) && end > start
 }
+
+export function minutesFromTimeOnly(value: string): number | null {
+  const normalized = normalizeTimeOnly(value)
+  if (!/^\d{2}:\d{2}$/.test(normalized)) return null
+  const parts = normalized.split(':').map(Number)
+  const hour = parts[0]
+  const minute = parts[1]
+  if (hour === undefined || minute === undefined) return null
+  return hour * 60 + minute
+}

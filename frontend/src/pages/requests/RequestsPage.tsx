@@ -24,13 +24,13 @@ export function RequestsPage() {
   const query = useRequests(filters)
   const mutations = useRequestMutations()
   const myTasks = useMyTasks({ page: 1, pageSize: 50, sortBy: 'deadline', sortDirection: 'asc' }, isStudent)
-  const students = useStudents({ page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' })
+  const students = useStudents({ page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }, canReview)
 
   const updateFilters = (patch: Partial<RequestFilters>) => setSearchParams(filtersToSearch({ ...filters, ...patch }))
 
   const columns = [
-    { key: 'type', header: 'Type', cell: (item: TaskRequest) => <Badge variant={item.type === 'EXTENSION' ? 'info' : 'brand'}>{item.type}</Badge> },
-    { key: 'task', header: 'Task', cell: (item: TaskRequest) => item.taskId.slice(0, 8) },
+    { key: 'type', header: 'Type', cell: (item: TaskRequest) => <Badge variant={item.type === 'EXTENSION' ? 'info' : 'brand'}>{formatRequestType(item.type)}</Badge> },
+    { key: 'task', header: 'Task', cell: (item: TaskRequest) => <div className="min-w-44"><p className="font-medium">{item.taskTitle ?? 'Task'}</p>{item.requestedByName ? <p className="text-xs text-text-muted">{item.requestedByName}</p> : null}</div> },
     { key: 'status', header: 'Status', cell: (item: TaskRequest) => <RequestStatusBadge status={item.status} /> },
     { key: 'deadline', header: 'Deadline', cell: (item: TaskRequest) => item.requestedDeadline ? formatIstanbulDateTime(item.requestedDeadline) : <MissingData kind="not-set" /> },
     { key: 'created', header: 'Created', cell: (item: TaskRequest) => formatIstanbulDateTime(item.createdAt), className: 'hidden lg:table-cell' },
@@ -131,7 +131,15 @@ function RequestActions({ item, canReview, canCancel, students, mutations }: { i
 
 function RequestStatusBadge({ status }: { status: RequestStatus }) {
   const variant = status === 'APPROVED' ? 'success' : status === 'REJECTED' ? 'danger' : status === 'PENDING' ? 'warning' : 'neutral'
-  return <Badge variant={variant}>{status}</Badge>
+  return <Badge variant={variant}>{formatRequestStatus(status)}</Badge>
+}
+
+function formatRequestType(type: RequestType) {
+  return type === 'EXTENSION' ? 'Extension' : 'Reassignment'
+}
+
+function formatRequestStatus(status: RequestStatus) {
+  return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
 function filtersFromSearch(searchParams: URLSearchParams): RequestFilters {
@@ -139,8 +147,8 @@ function filtersFromSearch(searchParams: URLSearchParams): RequestFilters {
     page: Number(searchParams.get('page') ?? 1),
     pageSize: Number(searchParams.get('pageSize') ?? 20),
     taskId: searchParams.get('taskId') ?? undefined,
-    type: searchParams.get('type') as RequestType | undefined,
-    status: searchParams.get('status') as RequestStatus | undefined,
+    type: (searchParams.get('type') ?? undefined) as RequestType | undefined,
+    status: (searchParams.get('status') ?? undefined) as RequestStatus | undefined,
   }
 }
 

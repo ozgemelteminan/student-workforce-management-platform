@@ -227,6 +227,10 @@ export function getStudents(search?: string, signal?: AbortSignal) {
   return apiRequest<PaginatedResult<Student>>(`/students${params({ page: 1, pageSize: 50, search })}`, { signal })
 }
 
-export function openSignedDownload(url: string) {
+export function openSignedDownload(url: string, fileName?: string) {
+  openTemporaryDownload({ downloadUrl: url, fileName })
+}
+
+export function openSignedView(url: string) {
   openTemporaryDownload({ downloadUrl: url })
 }

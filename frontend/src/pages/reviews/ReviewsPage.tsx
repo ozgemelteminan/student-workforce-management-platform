@@ -1,4 +1,4 @@
-import { Download, FileCheck2, RotateCcw } from 'lucide-react'
+import { Download, Eye, FileCheck2, RotateCcw } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, DataTable, ErrorState, FormField, MissingData, PageHeader, Textarea } from '../../components/ui'
 import type { ReviewQueueItem, SubmissionVersion } from '../../features/reviews/types'
@@ -75,7 +75,7 @@ export function ReviewsPage() {
                   getRowKey={(item) => item.id}
                   isLoading={versions.isLoading}
                   emptyState={<p className="text-sm text-text-secondary">No submission versions available.</p>}
-                  rowActions={(item) => item.fileStatus === 'CONFIRMED' ? <Button variant="ghost" size="icon" aria-label="Download submission version" onClick={() => submission && mutations.downloadVersion.mutate({ submissionId: submission.id, versionId: item.id })}><Download aria-hidden="true" className="h-4 w-4" /></Button> : null}
+                  rowActions={(item) => item.fileStatus === 'CONFIRMED' ? <div className="flex gap-1"><Button variant="ghost" size="icon" aria-label="View submission version" onClick={() => submission && mutations.viewVersion.mutate({ submissionId: submission.id, versionId: item.id })}><Eye aria-hidden="true" className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label="Download submission version" onClick={() => submission && mutations.downloadVersion.mutate({ submissionId: submission.id, versionId: item.id })}><Download aria-hidden="true" className="h-4 w-4" /></Button></div> : null}
                 />
                 <form className="space-y-3">
                   <FormField label="Reviewer comment">{({ id }) => <Textarea id={id} value={comment} onChange={(event) => setComment(event.target.value)} />}</FormField>

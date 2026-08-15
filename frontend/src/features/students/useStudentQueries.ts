@@ -5,8 +5,8 @@ import { getSkills } from '../skills/api/skillsApi'
 import { activateStudent, deactivateStudent, getCurrentStudent, getStudent, getStudentFeedback, getStudents, getStudentSkills, updateStudent, upsertStudentSkill } from './api/studentsApi'
 import type { StudentFilters, UpsertStudentSkillPayload, UpdateStudentPayload } from './types'
 
-export function useStudents(filters: StudentFilters) {
-  return useQuery({ queryKey: queryKeys.students.list(stableFilters(filters)), queryFn: ({ signal }) => getStudents(filters, signal) })
+export function useStudents(filters: StudentFilters, enabled = true) {
+  return useQuery({ queryKey: queryKeys.students.list(stableFilters(filters)), queryFn: ({ signal }) => getStudents(filters, signal), enabled })
 }
 
 export function useStudent(id: string | undefined) {

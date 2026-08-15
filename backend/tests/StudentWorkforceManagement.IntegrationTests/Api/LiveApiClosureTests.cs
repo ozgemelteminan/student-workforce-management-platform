@@ -200,7 +200,8 @@ public sealed class LiveApiClosureTests
         var defaults = await student.GetAsync("/api/v1/notifications/preferences");
         Assert.Equal(HttpStatusCode.OK, defaults.StatusCode);
         using var defaultsJson = await ReadJsonAsync(defaults);
-        Assert.Empty(defaultsJson.RootElement.EnumerateArray());
+        Assert.Equal(14, defaultsJson.RootElement.GetArrayLength());
+        Assert.All(defaultsJson.RootElement.EnumerateArray(), preference => Assert.True(preference.GetProperty("isEnabled").GetBoolean()));
 
         var update = await student.PutAsJsonAsync("/api/v1/notifications/preferences", new { preferenceType = "TaskAssigned", channel = "EMAIL", isEnabled = false });
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
@@ -210,7 +211,7 @@ public sealed class LiveApiClosureTests
         var afterPut = await student.GetAsync("/api/v1/notifications/preferences");
         Assert.Equal(HttpStatusCode.OK, afterPut.StatusCode);
         using var afterPutJson = await ReadJsonAsync(afterPut);
-        Assert.Equal(2, afterPutJson.RootElement.GetArrayLength());
+        Assert.Equal(14, afterPutJson.RootElement.GetArrayLength());
         var persisted = afterPutJson.RootElement.EnumerateArray().Single(preference =>
             preference.GetProperty("preferenceType").GetString() == "TaskAssigned"
             && preference.GetProperty("channel").GetString() == "EMAIL");
@@ -227,7 +228,8 @@ public sealed class LiveApiClosureTests
         var adminRead = await admin.GetAsync("/api/v1/notifications/preferences");
         Assert.Equal(HttpStatusCode.OK, adminRead.StatusCode);
         using var adminJson = await ReadJsonAsync(adminRead);
-        Assert.Empty(adminJson.RootElement.EnumerateArray());
+        Assert.Equal(14, adminJson.RootElement.GetArrayLength());
+        Assert.All(adminJson.RootElement.EnumerateArray(), preference => Assert.True(preference.GetProperty("isEnabled").GetBoolean()));
     }
 
     [Fact]

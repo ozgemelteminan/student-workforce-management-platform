@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, BellRing, Download, MessageSquarePlus, Paperclip, Play, Send, Trash2, UserPlus } from 'lucide-react'
+import { ArrowDown, ArrowUp, BellRing, Download, Eye, MessageSquarePlus, Paperclip, Play, Send, Trash2, UserPlus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, CardHeader, Checkbox, EmptyState, ErrorState, FormField, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '../../components/ui'
@@ -153,7 +153,7 @@ export function TaskDetailPage() {
               </Panel>
             </TabsContent>
             <TabsContent value="submissions" className="space-y-5">
-              <SubmissionsPanel task={taskData} submissions={collections.submissions.data} versions={versions.data} selectedSubmission={selectedSubmission} reviewer={reviewer} student={student} uploadError={uploadError} uploadProgress={uploadProgress} onFile={submitFile} onCancelUpload={() => uploadController?.abort()} onDownload={(submissionId, versionId) => mutations.downloadVersion.mutate({ submissionId, versionId })} onRevision={(submissionId, reviewerComment) => runMutation(() => mutations.requestRevision.mutateAsync({ submissionId, comment: reviewerComment }))} pending={mutations.initiateUpload.isPending || mutations.requestRevision.isPending || mutations.downloadVersion.isPending} />
+              <SubmissionsPanel task={taskData} submissions={collections.submissions.data} versions={versions.data} selectedSubmission={selectedSubmission} reviewer={reviewer} student={student} uploadError={uploadError} uploadProgress={uploadProgress} onFile={submitFile} onCancelUpload={() => uploadController?.abort()} onView={(submissionId, versionId) => mutations.viewVersion.mutate({ submissionId, versionId })} onDownload={(submissionId, versionId) => mutations.downloadVersion.mutate({ submissionId, versionId })} onRevision={(submissionId, reviewerComment) => runMutation(() => mutations.requestRevision.mutateAsync({ submissionId, comment: reviewerComment }))} pending={mutations.initiateUpload.isPending || mutations.requestRevision.isPending || mutations.downloadVersion.isPending || mutations.viewVersion.isPending} />
             </TabsContent>
             <TabsContent value="activity" className="space-y-5">
               <Panel title="Assignment history" error={collections.history.isError} onRetry={() => void collections.history.refetch()}>
@@ -204,18 +204,28 @@ function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex justify-between gap-3"><dt className="text-text-muted">{label}</dt><dd className="truncate font-medium text-text-primary">{value}</dd></div>
 }
 
-function SubmissionsPanel({ task, submissions, versions, selectedSubmission, reviewer, student, uploadError, uploadProgress, onFile, onCancelUpload, onDownload, onRevision, pending }: { task: Task; submissions?: Submission[]; versions?: { id: string; versionNumber: number; fileName: string; fileSize: number; fileStatus: string; uploadedAt: string }[]; selectedSubmission?: Submission; reviewer: boolean; student: boolean; uploadError: string | null; uploadProgress: number | null; onFile: (file: File | undefined) => Promise<void>; onCancelUpload: () => void; onDownload: (submissionId: string, versionId: string) => void; onRevision: (submissionId: string, comment: string) => Promise<unknown>; pending: boolean }) {
+function SubmissionsPanel({ task, submissions, versions, selectedSubmission, reviewer, student, uploadError, uploadProgress, onFile, onCancelUpload, onView, onDownload, onRevision, pending }: { task: Task; submissions?: Submission[]; versions?: { id: string; versionNumber: number; fileName: string; fileSize: number; fileStatus: string; fileExtension: string; uploadedAt: string }[]; selectedSubmission?: Submission; reviewer: boolean; student: boolean; uploadError: string | null; uploadProgress: number | null; onFile: (file: File | undefined) => Promise<void>; onCancelUpload: () => void; onView: (submissionId: string, versionId: string) => void; onDownload: (submissionId: string, versionId: string) => void; onRevision: (submissionId: string, comment: string) => Promise<unknown>; pending: boolean }) {
   const [reviewComment, setReviewComment] = useState('')
   return (
     <Panel title="Submissions">
       {submissions?.length === 0 ? <EmptyState title="No submissions yet." description={student ? 'Upload is available for assigned task work when backend storage is configured.' : 'No student submission has been recorded.'} /> : null}
       <div className="space-y-3">{submissions?.map((submission, index) => <div key={submission.id} className="rounded-md border border-border px-3 py-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">Submission #{index + 1}</p><Badge variant={submission.status === 'APPROVED' ? 'success' : submission.status === 'REVISION_REQUESTED' ? 'warning' : 'info'}>{submission.status}</Badge></div><p className="mt-1 text-text-secondary">{submission.submittedAt ? formatIstanbulDateTime(submission.submittedAt) : 'Not submitted yet'}</p></div>)}</div>
-      {selectedSubmission ? <div className="mt-4 space-y-2"><h3 className="text-sm font-semibold">Versions</h3>{versions?.map((version) => <div key={version.id} className="rounded-md border border-border px-3 py-2 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">v{version.versionNumber} · {version.fileName}</p>{version.fileStatus === 'CONFIRMED' ? <Button type="button" size="sm" variant="outline" iconBefore={<Download className="h-4 w-4" />} onClick={() => onDownload(selectedSubmission.id, version.id)}>Download</Button> : null}</div><p className="text-text-secondary">{version.fileStatus} · {Math.ceil(version.fileSize / 1024)} KB · {formatIstanbulDateTime(version.uploadedAt)}</p></div>)}</div> : null}
+      {selectedSubmission ? <div className="mt-4 space-y-2"><h3 className="text-sm font-semibold">Versions</h3>{versions?.map((version) => <div key={version.id} className="rounded-md border border-border px-3 py-2 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium">{version.fileName}</p><p className="text-text-secondary">{formatFileKind(version.fileExtension)} · {formatFileSize(version.fileSize)} · v{version.versionNumber} · {formatIstanbulDateTime(version.uploadedAt)}</p></div>{version.fileStatus === 'CONFIRMED' ? <div className="flex gap-2"><Button type="button" size="sm" variant="outline" iconBefore={<Eye className="h-4 w-4" />} onClick={() => onView(selectedSubmission.id, version.id)}>View</Button><Button type="button" size="sm" variant="outline" iconBefore={<Download className="h-4 w-4" />} onClick={() => onDownload(selectedSubmission.id, version.id)}>Download</Button></div> : <Badge variant="warning">{version.fileStatus}</Badge>}</div></div>)}</div> : null}
       {student && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? <div className="mt-4 space-y-2"><FormField label="Submission file" error={uploadError ?? undefined} helperText="Files must be 1 GB or smaller. Uploads use the signed direct storage flow.">{({ id, describedBy, invalid }) => <Input id={id} type="file" invalid={invalid} aria-describedby={describedBy} onChange={(event) => void onFile(event.currentTarget.files?.[0])} />}</FormField>{uploadProgress !== null ? <div className="flex items-center gap-3"><progress className="h-2 flex-1" max={100} value={uploadProgress} aria-label="Upload progress" /><Button type="button" size="sm" variant="outline" onClick={onCancelUpload}>Cancel upload</Button></div> : null}</div> : null}
       {reviewer && selectedSubmission?.status === 'SUBMITTED_FOR_REVIEW' ? <form className="mt-4 space-y-2" onSubmit={(event) => { event.preventDefault(); if (selectedSubmission && reviewComment.trim()) void onRevision(selectedSubmission.id, reviewComment) }}><Textarea aria-label="Revision comment" value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} /><Button type="submit" isLoading={pending} variant="outline" iconBefore={<Send className="h-4 w-4" />}>Request revision</Button></form> : null}
       <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Paperclip aria-hidden="true" className="mt-0.5 h-3.5 w-3.5" /> Download links request fresh temporary signed URLs on demand.</p>
     </Panel>
   )
+}
+
+function formatFileKind(extension: string) {
+  return extension.replace('.', '').toUpperCase() || 'File'
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
+  return `${(size / 1024 / 1024).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} MB`
 }
 
 function visibleTransitions(task: Task, roles: readonly string[]): { action: 'accept' | 'start' | 'submit'; label: string }[] {

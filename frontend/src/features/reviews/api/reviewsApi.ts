@@ -1,4 +1,4 @@
-import { getSubmissionVersionDownloadUrl, getSubmissionVersions, getSubmissions, getTasks, openSignedDownload } from '../../tasks/api/tasksApi'
+import { getSubmissionVersionDownloadUrl, getSubmissionVersions, getSubmissions, getTasks, openSignedDownload, openSignedView } from '../../tasks/api/tasksApi'
 import { apiRequest } from '../../../lib/api'
 import type { ReviewQueueItem, TaskReview } from '../types'
 
@@ -22,5 +22,10 @@ export function getVersions(taskId: string, submissionId: string, signal?: Abort
 
 export async function openSubmissionVersionDownload(submissionId: string, versionId: string) {
   const target = await getSubmissionVersionDownloadUrl(submissionId, versionId)
-  openSignedDownload(target.signedDownloadUrl)
+  openSignedDownload(target.signedDownloadUrl, target.fileName)
+}
+
+export async function openSubmissionVersionView(submissionId: string, versionId: string) {
+  const target = await getSubmissionVersionDownloadUrl(submissionId, versionId)
+  openSignedView(target.signedDownloadUrl)
 }

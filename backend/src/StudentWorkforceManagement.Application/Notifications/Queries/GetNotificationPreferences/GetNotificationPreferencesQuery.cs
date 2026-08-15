@@ -26,15 +26,29 @@ public sealed class GetNotificationPreferencesQueryHandler(
         CancellationToken cancellationToken)
     {
         var userId = currentUser.RequireUserId();
-        return await dbContext.NotificationPreferences
+        var persisted = await dbContext.NotificationPreferences
             .AsNoTracking()
             .Where(x => x.UserId == userId)
-            .Select(x => new NotificationPreferenceSettingDto(
+            .Select(x => new
+            {
                 x.PreferenceType,
                 x.Channel,
-                x.IsEnabled))
+                x.IsEnabled
+            })
+            .ToListAsync(cancellationToken);
+
+        var byKey = persisted.ToDictionary(
+            preference => (preference.PreferenceType, preference.Channel),
+            preference => preference.IsEnabled);
+
+        return Enum.GetValues<NotificationPreferenceType>()
+            .SelectMany(preferenceType => Enum.GetValues<NotificationChannel>()
+                .Select(channel => new NotificationPreferenceSettingDto(
+                    preferenceType,
+                    channel,
+                    byKey.TryGetValue((preferenceType, channel), out var isEnabled) ? isEnabled : true)))
             .OrderBy(preference => preference.PreferenceType)
             .ThenBy(preference => preference.Channel)
-            .ToListAsync(cancellationToken);
+            .ToList();
     }
 }

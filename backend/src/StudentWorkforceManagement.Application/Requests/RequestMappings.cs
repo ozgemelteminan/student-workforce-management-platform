@@ -40,6 +40,24 @@ internal static class RequestMappings
 {
     public static TaskRequestDto ToDto(TaskRequest request)
     {
-        return new TaskRequestDto(request.Id, request.TaskId, request.RequestedById, request.Type, request.Reason, request.CurrentDeadline, request.RequestedDeadline, request.SuggestedStudentId, request.Status, request.CreatedAt, request.ReviewedAt, request.ReviewedById, request.ReviewerComment, request.ConcurrencyToken);
+        return new TaskRequestDto(
+            request.Id,
+            request.TaskId,
+            request.RequestedById,
+            request.Type,
+            request.Reason,
+            request.CurrentDeadline,
+            request.RequestedDeadline,
+            request.SuggestedStudentId,
+            request.Status,
+            request.CreatedAt,
+            request.ReviewedAt,
+            request.ReviewedById,
+            request.ReviewerComment,
+            request.ConcurrencyToken,
+            request.Task?.Title,
+            request.RequestedBy is null ? null : $"{request.RequestedBy.FirstName} {request.RequestedBy.LastName}".Trim(),
+            request.SuggestedStudent is null ? null : $"{request.SuggestedStudent.FirstName} {request.SuggestedStudent.LastName}".Trim(),
+            request.ReviewedBy?.DisplayName);
     }
 }

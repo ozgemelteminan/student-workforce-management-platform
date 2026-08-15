@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getSubmissionVersionDownloadUrl, getTasks, initiateSubmissionUpload } from './tasksApi'
+import { getSubmissionVersionDownloadUrl, getTasks, initiateSubmissionUpload, uploadSubmissionFile } from './tasksApi'
 
 describe('tasks api client contracts', () => {
   afterEach(() => {
@@ -44,5 +44,36 @@ describe('tasks api client contracts', () => {
     }
     expect(uploadRequest.url).toContain('/tasks/task-id/uploads/initiate')
     expect(downloadRequest.url).toContain('/submissions/submission-id/versions/version-id/download-url')
+  })
+
+  it('finalizes submission uploads after the signed storage PUT succeeds', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const request = input as Request
+      if (request.url.includes('/uploads/initiate')) {
+        return Response.json({ submissionVersionId: 'version-id', taskSubmissionId: 'submission-id', versionNumber: 1, storageKey: 'task-submissions/key.txt', fileName: 'file.txt', fileSize: 4, mimeType: 'text/plain', fileExtension: '.txt', fileStatus: 'UPLOAD_PENDING', signedUploadUrl: 'https://storage.local/upload', uploadMethod: 'PUT', requiredHeaders: { 'Content-Type': 'text/plain' }, expiresAt: '2026-08-11T12:00:00Z' })
+      }
+      return Response.json({ id: 'version-id', taskSubmissionId: 'submission-id', versionNumber: 1, fileName: 'file.txt', storageKey: 'task-submissions/key.txt', fileSize: 4, mimeType: 'text/plain', fileExtension: '.txt', fileStatus: 'CONFIRMED', uploadedById: 'student-id', uploadedAt: '2026-08-11T12:00:00Z', confirmedAt: '2026-08-11T12:00:01Z' })
+    })
+    class UploadXhr {
+      upload = { onprogress: null as ((event: ProgressEvent) => void) | null }
+      status = 204
+      onload: (() => void) | null = null
+      open = vi.fn()
+      setRequestHeader = vi.fn()
+      send = vi.fn(() => this.onload?.())
+    }
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('XMLHttpRequest', UploadXhr)
+
+    const result = await uploadSubmissionFile('task-id', new File(['test'], 'file.txt', { type: 'text/plain' }))
+
+    expect(result.fileStatus).toBe('CONFIRMED')
+    const urls = fetchMock.mock.calls.map((call) => {
+      const request = call[0]
+      if (!(request instanceof Request)) throw new Error('Expected Request')
+      return request.url
+    })
+    expect(urls[0]).toContain('/tasks/task-id/uploads/initiate')
+    expect(urls[1]).toContain('/tasks/task-id/uploads/version-id/complete')
   })
 })

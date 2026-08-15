@@ -313,7 +313,8 @@ public sealed class ApplicationCompletionTests
 
         var fresh = await queryHandler.Handle(new GetNotificationPreferencesQuery(), CancellationToken.None);
 
-        Assert.Empty(fresh);
+        Assert.Equal(Enum.GetValues<NotificationPreferenceType>().Length * Enum.GetValues<NotificationChannel>().Length, fresh.Count);
+        Assert.All(fresh, preference => Assert.True(preference.IsEnabled));
         Assert.Empty(context.NotificationPreferences);
 
         await commandHandler.Handle(new UpdateNotificationPreferenceCommand(NotificationPreferenceType.TaskAssigned, NotificationChannel.EMAIL, false), CancellationToken.None);
@@ -323,7 +324,7 @@ public sealed class ApplicationCompletionTests
         var emailTaskAssigned = updated.Single(preference => preference.PreferenceType == NotificationPreferenceType.TaskAssigned && preference.Channel == NotificationChannel.EMAIL);
         var inAppAnnouncement = updated.Single(preference => preference.PreferenceType == NotificationPreferenceType.Announcement && preference.Channel == NotificationChannel.IN_APP);
 
-        Assert.Equal(2, updated.Count);
+        Assert.Equal(fresh.Count, updated.Count);
         Assert.False(emailTaskAssigned.IsEnabled);
         Assert.True(inAppAnnouncement.IsEnabled);
         Assert.Equal(2, context.NotificationPreferences.Count());

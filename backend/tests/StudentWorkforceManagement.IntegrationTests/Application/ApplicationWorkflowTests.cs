@@ -4,15 +4,19 @@ using StudentWorkforceManagement.Application.Common.Events;
 using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
+using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Collaboration.Commands;
 using StudentWorkforceManagement.Application.Collaboration.DTOs;
 using StudentWorkforceManagement.Application.Collaboration.Queries;
 using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceListings;
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
+using StudentWorkforceManagement.Application.Requests.Queries.GetTaskRequests;
+using StudentWorkforceManagement.Application.Notifications.Queries.GetNotificationPreferences;
 using StudentWorkforceManagement.Application.Skills.Commands;
 using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
 using StudentWorkforceManagement.Application.Students.Commands;
+using StudentWorkforceManagement.Application.Submissions.Queries.GetSubmission;
 using StudentWorkforceManagement.Application.Submissions.Commands.ReviewSubmission;
 using StudentWorkforceManagement.Application.Tasks.Commands.AssignTask;
 using StudentWorkforceManagement.Application.Tasks.Commands.CreateTask;
@@ -118,6 +122,108 @@ public sealed class ApplicationWorkflowTests
         var created = await handler.Handle(new CreateExtensionRequestCommand(task.Id, task.Deadline.AddDays(1), "Need time"), CancellationToken.None);
         Assert.Equal(RequestType.EXTENSION, created.Type);
         Assert.Equal(RequestStatus.PENDING, created.Status);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Request_queue_returns_human_readable_task_and_student_labels()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var task = SeedTask(context, "TOEFL Score Upload", assignedStudentId: student.Id, status: TaskStatus.IN_PROGRESS);
+        context.TaskRequests.Add(new TaskRequest
+        {
+            Id = Guid.NewGuid(),
+            TaskId = task.Id,
+            RequestedById = student.Id,
+            Type = RequestType.EXTENSION,
+            Reason = "Need more time for TOEFL score",
+            CurrentDeadline = task.Deadline,
+            RequestedDeadline = task.Deadline.AddDays(2),
+            Status = RequestStatus.PENDING
+        });
+        await context.SaveChangesAsync();
+        var handler = new GetTaskRequestsQueryHandler(context, new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER));
+
+        var page = await handler.Handle(new GetTaskRequestsQuery { Page = 1, PageSize = 20, Search = "toefl" }, CancellationToken.None);
+
+        var request = Assert.Single(page.Items);
+        Assert.Equal("TOEFL Score Upload", request.TaskTitle);
+        Assert.Equal($"{student.FirstName} {student.LastName}", request.RequestedByName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Notification_preferences_return_effective_defaults_without_persisted_rows()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        var handler = new GetNotificationPreferencesQueryHandler(context, new FakeCurrentUser(userId, null, UserRole.ADMIN));
+
+        var preferences = await handler.Handle(new GetNotificationPreferencesQuery(), CancellationToken.None);
+
+        Assert.Equal(Enum.GetValues<NotificationPreferenceType>().Length * Enum.GetValues<NotificationChannel>().Length, preferences.Count);
+        Assert.All(preferences, preference => Assert.True(preference.IsEnabled));
+        Assert.Empty(context.NotificationPreferences);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Notification_preferences_preserve_persisted_disabled_values()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        context.NotificationPreferences.Add(new NotificationPreference { Id = Guid.NewGuid(), UserId = userId, PreferenceType = NotificationPreferenceType.Announcement, Channel = NotificationChannel.EMAIL, IsEnabled = false });
+        await context.SaveChangesAsync();
+        var handler = new GetNotificationPreferencesQueryHandler(context, new FakeCurrentUser(userId, null, UserRole.STUDENT));
+
+        var preferences = await handler.Handle(new GetNotificationPreferencesQuery(), CancellationToken.None);
+
+        Assert.False(preferences.Single(preference => preference.PreferenceType == NotificationPreferenceType.Announcement && preference.Channel == NotificationChannel.EMAIL).IsEnabled);
+        Assert.True(preferences.Single(preference => preference.PreferenceType == NotificationPreferenceType.Announcement && preference.Channel == NotificationChannel.IN_APP).IsEnabled);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Submission_file_access_allows_confirmed_own_file_and_rejects_pending_or_other_student()
+    {
+        await using var context = CreateContext();
+        var owner = SeedStudent(context);
+        var other = SeedStudent(context);
+        var task = SeedTask(context, "Completed output", assignedStudentId: owner.Id, status: TaskStatus.COMPLETED);
+        var submission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = owner.Id, Status = SubmissionStatus.APPROVED, SubmittedAt = DateTimeOffset.UtcNow };
+        var confirmed = new SubmissionVersion
+        {
+            Id = Guid.NewGuid(),
+            TaskSubmissionId = submission.Id,
+            VersionNumber = 1,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "ToeflScore.pdf", StorageKey = "task-submissions/toefl.pdf", FileSize = 1_600_000, MimeType = "application/pdf", FileExtension = ".pdf" },
+            FileStatus = FileStatus.CONFIRMED,
+            UploadedById = owner.Id,
+            UploadedAt = DateTimeOffset.UtcNow,
+            ConfirmedAt = DateTimeOffset.UtcNow
+        };
+        var pending = new SubmissionVersion
+        {
+            Id = Guid.NewGuid(),
+            TaskSubmissionId = submission.Id,
+            VersionNumber = 2,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "Draft.pdf", StorageKey = "task-submissions/draft.pdf", FileSize = 100, MimeType = "application/pdf", FileExtension = ".pdf" },
+            FileStatus = FileStatus.UPLOAD_PENDING,
+            UploadedById = owner.Id,
+            UploadedAt = DateTimeOffset.UtcNow
+        };
+        context.TaskSubmissions.Add(submission);
+        context.SubmissionVersions.AddRange(confirmed, pending);
+        await context.SaveChangesAsync();
+
+        var ownerHandler = new GetSubmissionQueryHandler(context, new FakeCurrentUser(owner.UserId, owner.Id, UserRole.STUDENT), new FakeStorage());
+        var versions = await ownerHandler.Handle(new GetSubmissionVersionsQuery(submission.Id), CancellationToken.None);
+        var download = await ownerHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(confirmed.Id, submission.Id), CancellationToken.None);
+
+        Assert.Contains(versions, version => version.Id == confirmed.Id && version.FileStatus == FileStatus.CONFIRMED && version.FileName == "ToeflScore.pdf");
+        Assert.Contains(versions, version => version.Id == pending.Id && version.FileStatus == FileStatus.UPLOAD_PENDING);
+        Assert.Equal("ToeflScore.pdf", download.FileName);
+        await Assert.ThrowsAsync<ConflictException>(() => ownerHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(pending.Id, submission.Id), CancellationToken.None));
+
+        var otherHandler = new GetSubmissionQueryHandler(context, new FakeCurrentUser(other.UserId, other.Id, UserRole.STUDENT), new FakeStorage());
+        await Assert.ThrowsAsync<ForbiddenException>(() => otherHandler.Handle(new GetSubmissionVersionDownloadUrlQuery(confirmed.Id, submission.Id), CancellationToken.None));
     }
 
     [Fact]
@@ -515,6 +621,27 @@ public sealed class ApplicationWorkflowTests
     private sealed class CapturingNotificationIntentService : INotificationIntentService
     {
         public System.Threading.Tasks.Task CreateAsync(Guid userId, NotificationType type, string title, string message, string? relatedEntityType, Guid? relatedEntityId, string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    private sealed class FakeStorage : IFileStorage
+    {
+        public System.Threading.Tasks.Task<SignedUploadTarget> CreateUploadTargetAsync(UploadTargetRequest request, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.FromResult(new SignedUploadTarget(Guid.NewGuid(), $"task-submissions/{request.FileName}", new Uri("https://storage.local/upload"), DateTimeOffset.UtcNow.AddMinutes(15), false));
+
+        public System.Threading.Tasks.Task<SignedDownloadTarget> CreateDownloadTargetAsync(string storageKey, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.FromResult(new SignedDownloadTarget(new Uri($"https://storage.local/download/{Uri.EscapeDataString(storageKey)}"), DateTimeOffset.UtcNow.AddMinutes(15)));
+
+        public System.Threading.Tasks.Task<StoredFileMetadata?> GetMetadataAsync(string storageKey, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.FromResult<StoredFileMetadata?>(new StoredFileMetadata(storageKey, 1, "application/pdf", null));
+
+        public System.Threading.Tasks.Task SaveAsync(string storageKey, Stream content, string mimeType, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.CompletedTask;
+
+        public System.Threading.Tasks.Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default) =>
+            System.Threading.Tasks.Task.FromResult<Stream>(new MemoryStream());
+
+        public System.Threading.Tasks.Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default) =>
             System.Threading.Tasks.Task.CompletedTask;
     }
 

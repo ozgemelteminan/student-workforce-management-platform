@@ -16,4 +16,8 @@ public sealed record TaskRequestDto(
     DateTimeOffset? ReviewedAt,
     Guid? ReviewedById,
     string? ReviewerComment,
-    Guid ConcurrencyToken);
+    Guid ConcurrencyToken,
+    string? TaskTitle = null,
+    string? RequestedByName = null,
+    string? SuggestedStudentName = null,
+    string? ReviewedByName = null);

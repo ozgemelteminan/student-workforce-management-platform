@@ -32,6 +32,7 @@ import {
   getSubmissionVersionDownloadUrl,
   getTaskNudgeEligibility,
   openSignedDownload,
+  openSignedView,
   reassignTask,
   reorderChecklist,
   requestSubmissionRevision,
@@ -154,9 +155,13 @@ export function useTaskMutations(taskId?: string) {
       },
     }),
     completeUpload: useMutation({ mutationFn: (versionId: string) => completeSubmissionUpload(versionId), onSuccess: async () => invalidateTask() }),
+    viewVersion: useMutation({
+      mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => getSubmissionVersionDownloadUrl(submissionId, versionId),
+      onSuccess: (download) => openSignedView(download.signedDownloadUrl),
+    }),
     downloadVersion: useMutation({
       mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => getSubmissionVersionDownloadUrl(submissionId, versionId),
-      onSuccess: (download) => openSignedDownload(download.signedDownloadUrl),
+      onSuccess: (download) => openSignedDownload(download.signedDownloadUrl, download.fileName),
     }),
     addRequiredSkill: useMutation({ mutationFn: ({ id, skillId, minimumLevel }: { id: string; skillId: string; minimumLevel: SkillLevel }) => addRequiredSkill(id, skillId, minimumLevel), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.skills(variables.id) }) }),
     updateRequiredSkill: useMutation({ mutationFn: ({ id, skillId, minimumLevel }: { id: string; skillId: string; minimumLevel: SkillLevel }) => updateRequiredSkill(id, skillId, minimumLevel), onSuccess: async (_, variables) => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.skills(variables.id) }) }),

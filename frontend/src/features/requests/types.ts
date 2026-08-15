@@ -20,6 +20,10 @@ export type TaskRequest = {
   reviewedById?: string
   reviewerComment?: string
   concurrencyToken: string
+  taskTitle?: string | null
+  requestedByName?: string | null
+  suggestedStudentName?: string | null
+  reviewedByName?: string | null
 }
 
 export type RequestFilters = {

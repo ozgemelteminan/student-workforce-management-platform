@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, ClipboardList, Store, Target } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton } from '../../components/ui'
 import { deriveAttentionItems, focusModeTasks } from '../../features/tasks/attention'
 import { TaskDeadline, TaskPriorityBadge, TaskStatusBadge } from '../../features/tasks/components'
@@ -8,6 +8,7 @@ import { useMarketplaceListings } from '../../features/marketplace/useMarketplac
 import { useAuth } from '../../lib/auth/AuthProvider'
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const roles = user?.roles ?? []
   const isStudent = roles.includes('STUDENT')
@@ -25,7 +26,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Dashboard" description="Operational priorities from real task and task pool data." primaryAction={isStaff ? <Button iconBefore={<ClipboardList aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/tasks/new')}>Create task</Button> : <Button variant="outline" iconBefore={<Target aria-hidden="true" className="h-4 w-4" />} onClick={() => window.location.assign('/focus')}>Focus mode</Button>} />
+      <PageHeader title="Dashboard" description="Operational priorities from real task and task pool data." primaryAction={isStaff ? <Button iconBefore={<ClipboardList aria-hidden="true" className="h-4 w-4" />} onClick={() => navigate('/tasks/new')}>Create task</Button> : <Button variant="outline" iconBefore={<Target aria-hidden="true" className="h-4 w-4" />} onClick={() => navigate('/focus')}>Focus mode</Button>} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.8fr)]">
         <Card>
           <CardHeader>

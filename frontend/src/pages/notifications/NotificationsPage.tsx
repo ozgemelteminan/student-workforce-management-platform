@@ -1,5 +1,6 @@
 import { Check, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, PageHeader, SearchInput, Skeleton } from '../../components/ui'
 import { NotificationPreferencesPanel } from '../../components/layout/NotificationBell'
 import { getNotificationRoute } from '../../features/notifications/notificationRouting'
@@ -7,6 +8,7 @@ import { useNotificationMutations, useNotificationPreferences, useNotifications 
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
 export function NotificationsPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const notifications = useNotifications({ page: 1, pageSize: 40, search })
   const preferences = useNotificationPreferences()
@@ -38,7 +40,7 @@ export function NotificationsPage() {
                         <p className="mt-2 text-xs text-text-muted">{formatIstanbulDateTime(notification.createdAt)}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {route ? <Button variant="outline" size="sm" onClick={() => window.location.assign(route)}>Open</Button> : null}
+                        {route ? <Button variant="outline" size="sm" onClick={() => navigate(route)}>Open</Button> : null}
                         {!notification.isRead ? <Button variant="ghost" size="sm" onClick={() => mutations.markRead.mutate(notification.id)}>Mark read</Button> : null}
                       </div>
                     </div>

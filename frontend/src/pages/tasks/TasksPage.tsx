@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, DataTable, ErrorState, Pagination, PageHeader, SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../../components/ui'
-import { TaskActionsMenu, TaskDeadline, TaskEmpty, TaskPriorityBadge, TaskStatusBadge, TaskSummary } from '../../features/tasks/components'
+import { formatTaskAssignee, TaskActionsMenu, TaskDeadline, TaskEmpty, TaskPriorityBadge, TaskStatusBadge, TaskSummary } from '../../features/tasks/components'
 import { filtersFromSearchParams, filtersToSearchParams, type TaskView } from '../../features/tasks/taskFilters'
 import { formatDuration } from '../../features/tasks/taskPresentation'
 import type { Task, TaskFilters } from '../../features/tasks/types'
@@ -49,7 +49,7 @@ export function TasksPage() {
     { key: 'priority', header: 'Priority', cell: (task: Task) => <TaskPriorityBadge priority={task.priority} /> },
     { key: 'deadline', header: 'Deadline', cell: (task: Task) => <TaskDeadline task={task} compact /> },
     { key: 'estimate', header: 'Estimate', cell: (task: Task) => formatDuration(task.estimatedDurationMinutes), className: 'hidden lg:table-cell' },
-    { key: 'assignee', header: 'Assignee', cell: (task: Task) => task.assignedStudentId ? task.assignedStudentId.slice(0, 8) : 'Not set', className: 'hidden xl:table-cell' },
+    { key: 'assignee', header: 'Assignee', cell: (task: Task) => formatTaskAssignee(task), className: 'hidden xl:table-cell' },
   ]
 
   return (

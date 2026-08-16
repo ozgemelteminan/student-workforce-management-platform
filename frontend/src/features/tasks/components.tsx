@@ -55,7 +55,7 @@ export function TaskSummary({ task, checklist }: { task: Task; checklist?: TaskC
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-3">
         <Info icon={<Clock3 className="h-4 w-4" />} label="Estimate" value={formatDuration(task.estimatedDurationMinutes)} />
-        <Info icon={<UserRound className="h-4 w-4" />} label="Assignee" value={task.assignedStudentId ?? 'Not set'} />
+        <Info icon={<UserRound className="h-4 w-4" />} label="Assignee" value={formatTaskAssignee(task)} />
         <Info icon={<FileText className="h-4 w-4" />} label="Updated" value={formatIstanbulDateTime(task.updatedAt)} />
         <div className="md:col-span-3">
           <TaskDeadline task={task} />
@@ -66,6 +66,10 @@ export function TaskSummary({ task, checklist }: { task: Task; checklist?: TaskC
       </CardContent>
     </Card>
   )
+}
+
+export function formatTaskAssignee(task: Pick<Task, 'assignedStudentId' | 'assignedStudentName'>) {
+  return task.assignedStudentName || (task.assignedStudentId ? 'Assigned student' : 'Not set')
 }
 
 export function TaskActionsMenu({ task, canEdit, onCancel }: { task: Task; canEdit: boolean; onCancel?: () => void }) {

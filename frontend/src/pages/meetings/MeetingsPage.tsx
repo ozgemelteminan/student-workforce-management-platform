@@ -2,6 +2,7 @@ import { CalendarCheck, Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Textarea } from '../../components/ui'
+import { campusPresenceLabels, meetingStatusLabels, meetingTypeLabels } from '../../features/collaboration/collaborationPresentation'
 import { useCollaborationMutations, useMeeting, useMeetings, useMeetingSlots } from '../../features/collaboration/useCollaborationQueries'
 import { useTaskLookups } from '../../features/tasks/useTaskQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -44,14 +45,14 @@ export function MeetingsPage() {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold"><CalendarCheck className="h-4 w-4" /> Meeting queue</h2>
-              <Select value={status} onValueChange={(value) => setStatus(value as MeetingStatus | 'ALL')}><SelectTrigger className="w-48" aria-label="Meeting status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All</SelectItem>{meetingStatuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+              <Select value={status} onValueChange={(value) => setStatus(value as MeetingStatus | 'ALL')}><SelectTrigger className="w-48" aria-label="Meeting status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All</SelectItem>{meetingStatuses.map((item) => <SelectItem key={item} value={item}>{meetingStatusLabels[item]}</SelectItem>)}</SelectContent></Select>
             </div>
             {meetings.isError ? <ErrorState title="Meetings could not be loaded." description="Refresh the meeting queue or check your access." retryAction={<Button variant="outline" iconBefore={<RefreshCw className="h-4 w-4" />} onClick={() => void meetings.refetch()}>Retry</Button>} /> : null}
             {meetings.isLoading ? <Skeleton className="h-56" /> : null}
             <div className="divide-y divide-border rounded-lg border border-border">
               {meetings.data?.items.map((meeting) => (
                 <button key={meeting.id} type="button" className="block w-full px-3 py-3 text-left text-sm transition hover:bg-surface-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand" onClick={() => selectMeeting(meeting.id)}>
-                  <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{meeting.title}</span><Badge>{meeting.status}</Badge><Badge variant="info">{meeting.type}</Badge></span>
+                  <span className="flex flex-wrap items-center gap-2"><span className="font-medium">{meeting.title}</span><Badge>{meetingStatusLabels[meeting.status]}</Badge><Badge variant="info">{meetingTypeLabels[meeting.type]}</Badge></span>
                   <span className="mt-1 block text-text-secondary">Respond by {formatIstanbulDateTime(meeting.responseDeadline)} · {meeting.participants.length} participants</span>
                 </button>
               ))}
@@ -66,7 +67,7 @@ export function MeetingsPage() {
                 <h2 className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4" /> New meeting</h2>
                 <form className="grid gap-2 lg:grid-cols-2" onSubmit={(event) => { event.preventDefault(); if (create.title && create.responseDeadline && create.participantStudentIds.length) void mutations.createMeeting.mutateAsync({ ...create, responseDeadline: toApiInstant(create.responseDeadline), location: create.location || undefined, agenda: create.agenda || undefined }) }}>
                   <Input aria-label="Meeting title" value={create.title} onChange={(event) => setCreate((value) => ({ ...value, title: event.target.value }))} placeholder="Title" />
-                  <Select value={create.type} onValueChange={(type) => setCreate((value) => ({ ...value, type: type as MeetingType }))}><SelectTrigger aria-label="Meeting type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN_PERSON">In person</SelectItem><SelectItem value="ONLINE">Online</SelectItem></SelectContent></Select>
+                  <Select value={create.type} onValueChange={(type) => setCreate((value) => ({ ...value, type: type as MeetingType }))}><SelectTrigger aria-label="Meeting type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN_PERSON">{meetingTypeLabels.IN_PERSON}</SelectItem><SelectItem value="ONLINE">{meetingTypeLabels.ONLINE}</SelectItem></SelectContent></Select>
                   <Input aria-label="Response deadline" type="datetime-local" value={create.responseDeadline} onChange={(event) => setCreate((value) => ({ ...value, responseDeadline: event.target.value }))} />
                   <Select value={create.participantStudentIds[0] ?? ''} onValueChange={(studentId) => setCreate((value) => ({ ...value, participantStudentIds: [studentId] }))}><SelectTrigger aria-label="Participant"><SelectValue placeholder="Participant" /></SelectTrigger><SelectContent>{lookups.students.data?.items.map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName}</SelectItem>)}</SelectContent></Select>
                   <Input aria-label="Location" value={create.location} onChange={(event) => setCreate((value) => ({ ...value, location: event.target.value }))} placeholder="Location or link" />
@@ -82,9 +83,9 @@ export function MeetingsPage() {
               {selected.isLoading ? <Skeleton className="h-56" /> : null}
               {selected.data ? (
                 <div className="space-y-4">
-                  <div><div className="flex flex-wrap gap-2"><Badge>{selected.data.status}</Badge><Badge variant="info">{selected.data.type}</Badge></div><h2 className="mt-2 text-base font-semibold">{selected.data.title}</h2><p className="text-sm text-text-secondary">Deadline {formatIstanbulDateTime(selected.data.responseDeadline)}</p></div>
+                  <div><div className="flex flex-wrap gap-2"><Badge>{meetingStatusLabels[selected.data.status]}</Badge><Badge variant="info">{meetingTypeLabels[selected.data.type]}</Badge></div><h2 className="mt-2 text-base font-semibold">{selected.data.title}</h2><p className="text-sm text-text-secondary">Deadline {formatIstanbulDateTime(selected.data.responseDeadline)}</p></div>
                   <form className="grid gap-2 md:grid-cols-[12rem_1fr_1fr]" onSubmit={(event) => { event.preventDefault(); if (response.startAt && response.endAt) void mutations.respondMeeting.mutate({ id: selected.data.id, campusPresence: response.campusPresence, availableRangesJson: JSON.stringify([{ startAt: toApiInstant(response.startAt), endAt: toApiInstant(response.endAt) }]), note: response.note || undefined }) }}>
-                    <Select value={response.campusPresence} onValueChange={(campusPresence) => setResponse((value) => ({ ...value, campusPresence: campusPresence as CampusPresence }))}><SelectTrigger aria-label="Campus presence"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ON_CAMPUS">On campus</SelectItem><SelectItem value="OFF_CAMPUS">Off campus</SelectItem><SelectItem value="UNSURE">Unsure</SelectItem></SelectContent></Select>
+                    <Select value={response.campusPresence} onValueChange={(campusPresence) => setResponse((value) => ({ ...value, campusPresence: campusPresence as CampusPresence }))}><SelectTrigger aria-label="Campus presence"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ON_CAMPUS">{campusPresenceLabels.ON_CAMPUS}</SelectItem><SelectItem value="OFF_CAMPUS">{campusPresenceLabels.OFF_CAMPUS}</SelectItem><SelectItem value="UNSURE">{campusPresenceLabels.UNSURE}</SelectItem></SelectContent></Select>
                     <Input aria-label="Available from" type="datetime-local" value={response.startAt} onChange={(event) => setResponse((value) => ({ ...value, startAt: event.target.value }))} />
                     <Input aria-label="Available until" type="datetime-local" value={response.endAt} onChange={(event) => setResponse((value) => ({ ...value, endAt: event.target.value }))} />
                     <Textarea aria-label="Availability note" className="md:col-span-3" value={response.note} onChange={(event) => setResponse((value) => ({ ...value, note: event.target.value }))} />

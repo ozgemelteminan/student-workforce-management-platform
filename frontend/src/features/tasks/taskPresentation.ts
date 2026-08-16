@@ -1,18 +1,45 @@
 import { differenceInCalendarDays } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 import { DISPLAY_TIME_ZONE, formatIstanbulDate, formatIstanbulDateTime } from '../../lib/date-time'
-import type { Task, TaskPriority, TaskStatus } from './types'
+import type { AssignmentMode, AssignmentStatus, FileStatus, SubmissionStatus, Task, TaskPriority, TaskStatus } from './types'
 
 export const statusLabels: Record<TaskStatus, string> = {
   ASSIGNED: 'Assigned',
   ACCEPTED: 'Accepted',
   IN_PROGRESS: 'In progress',
-  SUBMITTED_FOR_REVIEW: 'Submitted',
+  SUBMITTED_FOR_REVIEW: 'Submitted for review',
   COMPLETED: 'Completed',
   INCOMPLETE: 'Incomplete',
   CANNOT_COMPLETE: 'Cannot complete',
   CANCELLED: 'Cancelled',
   OVERDUE: 'Overdue',
+}
+
+export const submissionStatusLabels: Record<SubmissionStatus, string> = {
+  DRAFT: 'Draft',
+  SUBMITTED_FOR_REVIEW: 'Submitted for review',
+  APPROVED: 'Approved',
+  REVISION_REQUESTED: 'Revision requested',
+}
+
+export const fileStatusLabels: Record<FileStatus, string> = {
+  UPLOAD_PENDING: 'Upload pending',
+  UPLOADED: 'Uploaded',
+  CONFIRMED: 'Confirmed',
+  FAILED: 'Failed',
+  DELETED: 'Deleted',
+}
+
+export const assignmentStatusLabels: Record<AssignmentStatus, string> = {
+  ACTIVE: 'Active',
+  UNASSIGNED: 'Unassigned',
+  REASSIGNED: 'Reassigned',
+}
+
+export const assignmentModeLabels: Record<AssignmentMode, string> = {
+  MANUAL: 'Manual',
+  MARKETPLACE: 'Task pool',
+  REASSIGNMENT: 'Reassignment',
 }
 
 export const priorityLabels: Record<TaskPriority, string> = {
@@ -27,6 +54,20 @@ export function statusVariant(status: TaskStatus) {
   if (status === 'OVERDUE' || status === 'CANCELLED' || status === 'CANNOT_COMPLETE') return 'danger' as const
   if (status === 'INCOMPLETE') return 'warning' as const
   if (status === 'SUBMITTED_FOR_REVIEW' || status === 'IN_PROGRESS') return 'info' as const
+  return 'neutral' as const
+}
+
+export function submissionStatusVariant(status: SubmissionStatus) {
+  if (status === 'APPROVED') return 'success' as const
+  if (status === 'REVISION_REQUESTED') return 'warning' as const
+  if (status === 'SUBMITTED_FOR_REVIEW') return 'info' as const
+  return 'neutral' as const
+}
+
+export function fileStatusVariant(status: FileStatus) {
+  if (status === 'CONFIRMED') return 'success' as const
+  if (status === 'FAILED' || status === 'DELETED') return 'danger' as const
+  if (status === 'UPLOAD_PENDING' || status === 'UPLOADED') return 'warning' as const
   return 'neutral' as const
 }
 

@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, DataTable, ErrorState, Pagination, PageHeader, SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../../components/ui'
 import { formatTaskAssignee, TaskActionsMenu, TaskDeadline, TaskEmpty, TaskPriorityBadge, TaskStatusBadge, TaskSummary } from '../../features/tasks/components'
 import { filtersFromSearchParams, filtersToSearchParams, type TaskView } from '../../features/tasks/taskFilters'
-import { formatDuration } from '../../features/tasks/taskPresentation'
+import { formatDuration, statusLabels } from '../../features/tasks/taskPresentation'
 import type { Task, TaskFilters } from '../../features/tasks/types'
 import { useTask, useTaskCollections, useTasks, useMyTasks } from '../../features/tasks/useTaskQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -68,7 +68,7 @@ export function TasksPage() {
               </Select>
               <Select value={filters.status ?? 'any'} onValueChange={(value) => updateFilters({ status: value === 'any' ? undefined : value as Task['status'], page: 1 })}>
                 <SelectTrigger aria-label="Status filter"><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>{['any', 'ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'COMPLETED', 'INCOMPLETE', 'CANNOT_COMPLETE', 'CANCELLED', 'OVERDUE'].map((status) => <SelectItem key={status} value={status}>{status === 'any' ? 'Any status' : status}</SelectItem>)}</SelectContent>
+                <SelectContent>{['any', 'ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'SUBMITTED_FOR_REVIEW', 'COMPLETED', 'INCOMPLETE', 'CANNOT_COMPLETE', 'CANCELLED', 'OVERDUE'].map((status) => <SelectItem key={status} value={status}>{status === 'any' ? 'Any status' : statusLabels[status as Task['status']]}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={filters.priority ?? 'any'} onValueChange={(value) => updateFilters({ priority: value === 'any' ? undefined : value as Task['priority'], page: 1 })}>
                 <SelectTrigger aria-label="Priority filter"><SelectValue placeholder="Priority" /></SelectTrigger>

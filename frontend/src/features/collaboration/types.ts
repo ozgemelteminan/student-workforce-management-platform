@@ -3,7 +3,7 @@ import type { PaginatedResult, TaskDifficulty, TaskPriority } from '../tasks/typ
 export type { PaginatedResult }
 
 export type TimesheetStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'NEEDS_CORRECTION'
-export type MeetingType = 'IN_PERSON' | 'ONLINE'
+export type MeetingType = 'IN_PERSON' | 'ONLINE' | 'HYBRID'
 export type MeetingStatus = 'DRAFT' | 'AVAILABILITY_REQUESTED' | 'CONFIRMED' | 'CANCELLED'
 export type CampusPresence = 'ON_CAMPUS' | 'OFF_CAMPUS' | 'UNSURE'
 

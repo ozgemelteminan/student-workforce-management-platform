@@ -100,4 +100,32 @@ describe('ReviewsPage', () => {
     expect(grid.className).toContain('xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]')
     expect(within(grid).getByText('Review queue')).toBeInTheDocument()
   })
+
+  it('renders submission version file status with a human-readable label', () => {
+    useReviewVersions.mockReturnValue({
+      data: [
+        {
+          id: 'version-1',
+          taskSubmissionId: 'active-submission',
+          versionNumber: 1,
+          fileName: 'report.docx',
+          storageKey: 'task-submissions/report.docx',
+          fileSize: 2048,
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          fileExtension: '.docx',
+          fileStatus: 'UPLOAD_PENDING',
+          uploadedById: 'student-1',
+          uploadedAt: '2026-08-16T10:30:00Z',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    })
+
+    render(<ReviewsPage />)
+    fireEvent.click(screen.getByText('Review me'))
+
+    expect(screen.getByText('Upload pending')).toBeInTheDocument()
+    expect(screen.queryByText('UPLOAD_PENDING')).not.toBeInTheDocument()
+  })
 })

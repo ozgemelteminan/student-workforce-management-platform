@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, DataTable, ErrorState, Fo
 import type { ReviewQueueItem, SubmissionVersion } from '../../features/reviews/types'
 import { useReviewMutations, useReviewQueue, useReviewVersions } from '../../features/reviews/useReviewQueries'
 import { TaskDeadline, TaskPriorityBadge, TaskStatusBadge } from '../../features/tasks/components'
-import { formatDuration } from '../../features/tasks/taskPresentation'
+import { fileStatusLabels, fileStatusVariant, formatDuration } from '../../features/tasks/taskPresentation'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
 export function ReviewsPage() {
@@ -25,7 +25,7 @@ export function ReviewsPage() {
   const versionColumns = [
     { key: 'version', header: 'Version', cell: (item: SubmissionVersion) => <Badge variant="neutral">v{item.versionNumber}</Badge> },
     { key: 'file', header: 'File', cell: (item: SubmissionVersion) => <div className="min-w-48"><p className="font-medium">{item.fileName}</p><p className="text-xs text-text-muted">{item.fileExtension} · {formatFileSize(item.fileSize)}</p></div> },
-    { key: 'status', header: 'Status', cell: (item: SubmissionVersion) => <Badge variant={item.fileStatus === 'CONFIRMED' ? 'success' : 'warning'}>{item.fileStatus}</Badge> },
+    { key: 'status', header: 'Status', cell: (item: SubmissionVersion) => <Badge variant={fileStatusVariant(item.fileStatus)}>{fileStatusLabels[item.fileStatus]}</Badge> },
     { key: 'uploaded', header: 'Uploaded', cell: (item: SubmissionVersion) => formatIstanbulDateTime(item.uploadedAt), className: 'hidden lg:table-cell' },
   ]
 

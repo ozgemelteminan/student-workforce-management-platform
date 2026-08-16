@@ -821,7 +821,7 @@ public sealed class ApplicationWorkflowTests
         await context.SaveChangesAsync();
         var staff = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER);
         var commandHandler = CreateCollaborationCommandHandler(context, staff);
-        var meeting = await commandHandler.Handle(new CreateMeetingCommand("Meetign", MeetingType.IN_PERSON, DateTimeOffset.UtcNow.AddDays(1), new[] { attendee.Id }, "Campus", "Draft agenda"), CancellationToken.None);
+        var meeting = await commandHandler.Handle(new CreateMeetingCommand("Meeting", MeetingType.IN_PERSON, DateTimeOffset.UtcNow.AddDays(1), new[] { attendee.Id }, "Campus", "Draft agenda"), CancellationToken.None);
 
         var updated = await commandHandler.Handle(new UpdateMeetingNotesCommand(meeting.Id, "Meeting", "Final agenda", "Bring updates."), CancellationToken.None);
         var detail = await new CollaborationQueryHandler(context, staff, new FakeClock()).Handle(new GetMeetingQuery(meeting.Id), CancellationToken.None);

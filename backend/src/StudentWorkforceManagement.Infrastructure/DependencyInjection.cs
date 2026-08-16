@@ -46,118 +46,193 @@ namespace StudentWorkforceManagement.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment? environment = null)
     {
         var isDevelopment = environment?.IsDevelopment() != false;
+
         services.AddSingleton<IUtcClock, UtcClock>();
         services.AddScoped<AuditableEntityInterceptor>();
         services.AddScoped<ConcurrencyTokenInterceptor>();
 
-        var configuredConnectionString = configuration.GetConnectionString("DefaultConnection")
+        var configuredConnectionString =
+            configuration.GetConnectionString("DefaultConnection")
             ?? configuration["DATABASE_CONNECTION_STRING"];
+
         if (!isDevelopment && string.IsNullOrWhiteSpace(configuredConnectionString))
         {
-            throw new InvalidOperationException("Production database connection string must be explicitly configured.");
+            throw new InvalidOperationException(
+                "Production database connection string must be explicitly configured.");
         }
 
-        var connectionString = configuredConnectionString
+        var connectionString =
+            configuredConnectionString
             ?? "Host=localhost;Port=5432;Database=student_workforce;Username=student_workforce;Password=student_workforce_dev_password";
 
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
         {
             options.UseNpgsql(connectionString);
+
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<AuditableEntityInterceptor>(),
                 serviceProvider.GetRequiredService<ConcurrencyTokenInterceptor>());
         });
-        services.AddScoped<IApplicationDbContext>(serviceProvider => serviceProvider.GetRequiredService<ApplicationDbContext>());
+
+        services.AddScoped<IApplicationDbContext>(
+            serviceProvider =>
+                serviceProvider.GetRequiredService<ApplicationDbContext>());
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(options => options.SigningKey.Length >= 32, "JWT signing key must be at least 32 characters.")
-            .Validate(options => options.SigningKey.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase) == false, "JWT signing key must be supplied by secure environment configuration.")
+            .Validate(
+                options => options.SigningKey.Length >= 32,
+                "JWT signing key must be at least 32 characters.")
+            .Validate(
+                options =>
+                    options.SigningKey.Contains(
+                        "CHANGE_ME",
+                        StringComparison.OrdinalIgnoreCase) == false,
+                "JWT signing key must be supplied by secure environment configuration.")
             .ValidateOnStart();
+
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IPasswordService, IdentityPasswordService>();
         services.AddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
         services.AddScoped<IAccessTokenService, JwtAccessTokenService>();
 
-        var redisConnection = configuration["REDIS_CONNECTION_STRING"] ?? configuration.GetConnectionString("Redis");
+        var redisConnection =
+            configuration["REDIS_CONNECTION_STRING"]
+            ?? configuration.GetConnectionString("Redis");
+
         if (!isDevelopment && string.IsNullOrWhiteSpace(redisConnection))
         {
-            throw new InvalidOperationException("Production Redis connection string must be explicitly configured for Data Protection key persistence.");
+            throw new InvalidOperationException(
+                "Production Redis connection string must be explicitly configured for Data Protection key persistence.");
         }
 
         Lazy<IConnectionMultiplexer>? redisMultiplexer = null;
+
         if (string.IsNullOrWhiteSpace(redisConnection) == false)
         {
-            redisMultiplexer = new Lazy<IConnectionMultiplexer>(() => ConnectionMultiplexer.Connect(redisConnection));
+            redisMultiplexer = new Lazy<IConnectionMultiplexer>(
+                () => ConnectionMultiplexer.Connect(redisConnection));
+
             services.AddSingleton(_ => redisMultiplexer.Value);
         }
 
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(options => ValidateEmailOptions(options, isDevelopment), "Invalid email provider configuration.")
+            .Validate(
+                options => ValidateEmailOptions(options, isDevelopment),
+                "Invalid email provider configuration.")
             .ValidateOnStart();
-        var dataProtectionBuilder = services.AddDataProtection()
+
+        var dataProtectionBuilder = services
+            .AddDataProtection()
             .SetApplicationName("student-workforce-management");
+
         if (!isDevelopment)
         {
-            dataProtectionBuilder.PersistKeysToStackExchangeRedis(redisMultiplexer!.Value, "StudentWorkforceManagement:DataProtectionKeys");
+            dataProtectionBuilder.PersistKeysToStackExchangeRedis(
+                redisMultiplexer!.Value,
+                "StudentWorkforceManagement:DataProtectionKeys");
         }
         else
         {
-            var dataProtectionKeysPath = configuration["DataProtection:KeysPath"];
+            var dataProtectionKeysPath =
+                configuration["DataProtection:KeysPath"];
+
             if (string.IsNullOrWhiteSpace(dataProtectionKeysPath) == false)
             {
-                dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+                dataProtectionBuilder.PersistKeysToFileSystem(
+                    new DirectoryInfo(dataProtectionKeysPath));
             }
         }
+
         services.AddSingleton<IEmailSecretProtector, DataProtectionEmailSecretProtector>();
         services.AddSingleton<EmailTemplateRenderer>();
         services.AddScoped<EmailMessageFactory>();
         services.AddScoped<IEmailService, EmailService>();
+
         services.AddScoped<DevelopmentEmailProvider>();
         services.AddScoped<SmtpEmailProvider>();
+
         services.AddHttpClient<SendGridEmailProvider>(client =>
         {
             client.BaseAddress = new Uri("https://api.sendgrid.com/v3/");
             client.Timeout = TimeSpan.FromSeconds(15);
         }).AddStandardResilienceHandler();
+
+        services.AddHttpClient<BrevoEmailProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.brevo.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        }).AddStandardResilienceHandler();
+
         services.AddScoped<IEmailProvider>(serviceProvider =>
         {
-            var provider = serviceProvider.GetRequiredService<IOptions<EmailOptions>>().Value.Provider;
+            var provider = serviceProvider
+                .GetRequiredService<IOptions<EmailOptions>>()
+                .Value.Provider;
+
             return provider.Trim().ToUpperInvariant() switch
             {
-                "DEVELOPMENT" => serviceProvider.GetRequiredService<DevelopmentEmailProvider>(),
-                "SMTP" => serviceProvider.GetRequiredService<SmtpEmailProvider>(),
-                "SENDGRID" => serviceProvider.GetRequiredService<SendGridEmailProvider>(),
-                _ => throw new InvalidOperationException($"Unsupported email provider '{provider}'.")
+                "DEVELOPMENT" =>
+                    serviceProvider.GetRequiredService<DevelopmentEmailProvider>(),
+
+                "SMTP" =>
+                    serviceProvider.GetRequiredService<SmtpEmailProvider>(),
+
+                "SENDGRID" =>
+                    serviceProvider.GetRequiredService<SendGridEmailProvider>(),
+
+                "BREVO" =>
+                    serviceProvider.GetRequiredService<BrevoEmailProvider>(),
+
+                _ => throw new InvalidOperationException(
+                    $"Unsupported email provider '{provider}'.")
             };
         });
 
         services.AddOptions<StorageOptions>()
             .Bind(configuration.GetSection(StorageOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(options => ValidateStorageOptions(options, isDevelopment), "Invalid storage provider configuration.")
+            .Validate(
+                options => ValidateStorageOptions(options, isDevelopment),
+                "Invalid storage provider configuration.")
             .ValidateOnStart();
+
         services.AddOptions<UploadFilePolicyOptions>()
             .Bind(configuration.GetSection(UploadFilePolicyOptions.SectionName))
             .ValidateDataAnnotations()
-            .Validate(UploadFilePolicy.ValidateOptions, "Invalid upload file policy configuration.")
+            .Validate(
+                UploadFilePolicy.ValidateOptions,
+                "Invalid upload file policy configuration.")
             .ValidateOnStart();
+
         services.AddScoped<LocalFileStorage>();
         services.AddScoped<S3FileStorage>();
+
         services.AddScoped<IFileStorage>(serviceProvider =>
         {
-            var provider = serviceProvider.GetRequiredService<IOptions<StorageOptions>>().Value.Provider;
+            var provider = serviceProvider
+                .GetRequiredService<IOptions<StorageOptions>>()
+                .Value.Provider;
+
             return provider.Trim().ToUpperInvariant() switch
             {
-                "LOCAL" => serviceProvider.GetRequiredService<LocalFileStorage>(),
-                "S3" => serviceProvider.GetRequiredService<S3FileStorage>(),
-                _ => throw new InvalidOperationException($"Unsupported storage provider '{provider}'.")
+                "LOCAL" =>
+                    serviceProvider.GetRequiredService<LocalFileStorage>(),
+
+                "S3" =>
+                    serviceProvider.GetRequiredService<S3FileStorage>(),
+
+                _ => throw new InvalidOperationException(
+                    $"Unsupported storage provider '{provider}'.")
             };
         });
 
@@ -166,18 +241,29 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        var backgroundJobOptions = configuration.GetSection(BackgroundJobOptions.SectionName).Get<BackgroundJobOptions>() ?? new BackgroundJobOptions();
+        var backgroundJobOptions =
+            configuration
+                .GetSection(BackgroundJobOptions.SectionName)
+                .Get<BackgroundJobOptions>()
+            ?? new BackgroundJobOptions();
+
         services.AddHangfire(config => config
             .UseSimpleAssemblyNameTypeSerializer()
             .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString), new PostgreSqlStorageOptions
-            {
-                SchemaName = backgroundJobOptions.HangfireSchemaName,
-                PrepareSchemaIfNecessary = true
-            }));
+            .UsePostgreSqlStorage(
+                options => options.UseNpgsqlConnection(connectionString),
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = backgroundJobOptions.HangfireSchemaName,
+                    PrepareSchemaIfNecessary = true
+                }));
+
         if (backgroundJobOptions.EnableServer)
         {
-            services.AddHangfireServer(options => options.WorkerCount = Math.Max(1, Environment.ProcessorCount));
+            services.AddHangfireServer(
+                options =>
+                    options.WorkerCount =
+                        Math.Max(1, Environment.ProcessorCount));
         }
 
         services.AddScoped<DeadlineReminderJob>();
@@ -189,56 +275,103 @@ public static class DependencyInjection
         services.AddScoped<RetentionCleanupJob>();
         services.AddScoped<DataExportJob>();
         services.AddScoped<IExportJobScheduler, HangfireExportJobScheduler>();
+
         services.AddOptions<DataExportOptions>()
             .Bind(configuration.GetSection(DataExportOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
         services.AddScoped<MarketplaceClaimExpirationJob>();
         services.AddScoped<SemesterRolloverJob>();
         services.AddScoped<WeeklyTimesheetReminderJob>();
 
         var signalR = services.AddSignalR();
+
         if (redisMultiplexer is not null)
         {
             signalR.AddStackExchangeRedis(options =>
             {
-                options.ConnectionFactory = _ => System.Threading.Tasks.Task.FromResult(redisMultiplexer.Value);
+                options.ConnectionFactory = _ =>
+                    System.Threading.Tasks.Task.FromResult(
+                        redisMultiplexer.Value);
             });
         }
-        services.AddScoped<INotificationRealtimeDispatcher, SignalRNotificationDispatcher>();
+
+        services.AddScoped<
+            INotificationRealtimeDispatcher,
+            SignalRNotificationDispatcher>();
 
         services.AddHealthChecks()
-            .AddCheck<PostgreSqlHealthCheck>("postgresql", HealthStatus.Unhealthy, ["ready"])
-            .AddCheck<StorageHealthCheck>("storage", HealthStatus.Unhealthy, ["ready"])
-            .AddCheck<HangfireHealthCheck>("hangfire", HealthStatus.Unhealthy, ["ready"])
-            .AddCheck<RedisHealthCheck>("redis", HealthStatus.Degraded, ["ready"]);
+            .AddCheck<PostgreSqlHealthCheck>(
+                "postgresql",
+                HealthStatus.Unhealthy,
+                ["ready"])
+            .AddCheck<StorageHealthCheck>(
+                "storage",
+                HealthStatus.Unhealthy,
+                ["ready"])
+            .AddCheck<HangfireHealthCheck>(
+                "hangfire",
+                HealthStatus.Unhealthy,
+                ["ready"])
+            .AddCheck<RedisHealthCheck>(
+                "redis",
+                HealthStatus.Degraded,
+                ["ready"]);
 
         return services;
     }
 
-    private static bool ValidateEmailOptions(EmailOptions options, bool isDevelopment)
+    private static bool ValidateEmailOptions(
+        EmailOptions options,
+        bool isDevelopment)
     {
-        var provider = options.Provider.Trim().ToUpperInvariant();
+        var provider = options.Provider
+            .Trim()
+            .ToUpperInvariant();
+
         return provider switch
         {
-            "DEVELOPMENT" => isDevelopment,
-            "SMTP" => string.IsNullOrWhiteSpace(options.Smtp.Host) == false,
-            "SENDGRID" => string.IsNullOrWhiteSpace(options.SendGridApiKey) == false,
+            "DEVELOPMENT" =>
+                isDevelopment,
+
+            "SMTP" =>
+                string.IsNullOrWhiteSpace(options.Smtp.Host) == false,
+
+            "SENDGRID" =>
+                string.IsNullOrWhiteSpace(options.SendGridApiKey) == false,
+
+            "BREVO" =>
+                string.IsNullOrWhiteSpace(options.Brevo.ApiKey) == false,
+
             _ => false
         };
     }
 
-    private static bool ValidateStorageOptions(StorageOptions options, bool isDevelopment)
+    private static bool ValidateStorageOptions(
+        StorageOptions options,
+        bool isDevelopment)
     {
         if (options.SignedUrlLifetimeMinutes > 60)
         {
             return false;
         }
-        var provider = options.Provider.Trim().ToUpperInvariant();
+
+        var provider = options.Provider
+            .Trim()
+            .ToUpperInvariant();
+
         return provider switch
         {
-            "LOCAL" => isDevelopment && string.IsNullOrWhiteSpace(options.LocalRootPath) == false,
-            "S3" => string.IsNullOrWhiteSpace(options.S3.BucketName) == false && string.IsNullOrWhiteSpace(options.S3.AccessKey) == false && string.IsNullOrWhiteSpace(options.S3.SecretKey) == false,
+            "LOCAL" =>
+                isDevelopment
+                && string.IsNullOrWhiteSpace(options.LocalRootPath) == false,
+
+            "S3" =>
+                string.IsNullOrWhiteSpace(options.S3.BucketName) == false
+                && string.IsNullOrWhiteSpace(options.S3.AccessKey) == false
+                && string.IsNullOrWhiteSpace(options.S3.SecretKey) == false,
+
             _ => false
         };
     }

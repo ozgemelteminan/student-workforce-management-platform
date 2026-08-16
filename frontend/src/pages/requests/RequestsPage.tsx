@@ -3,11 +3,12 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, CardHeader, DataTable, ErrorState, FormField, Input, MissingData, PageHeader, Pagination, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '../../components/ui'
 import type { RequestFilters, RequestStatus, RequestType, TaskRequest } from '../../features/requests/types'
+import { requestStatusLabels, requestTypeLabels } from '../../features/requests/requestPresentation'
 import { useRequestMutations, useRequests } from '../../features/requests/useRequestQueries'
 import { useStudents } from '../../features/students/useStudentQueries'
 import { TaskDeadline } from '../../features/tasks/components'
 import type { Task, TaskStatus } from '../../features/tasks/types'
-import { useMyTasks } from '../../features/tasks/useTaskQueries'
+import { useMyTasks, useTasks } from '../../features/tasks/useTaskQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
@@ -21,17 +22,19 @@ export function RequestsPage() {
   const isStudent = roles.includes('STUDENT')
   const canReview = roles.includes('ADMIN') || roles.includes('TASK_MANAGER')
   const [searchParams, setSearchParams] = useSearchParams()
+  const [taskSearch, setTaskSearch] = useState('')
   const filters = useMemo(() => filtersFromSearch(searchParams), [searchParams])
   const query = useRequests(filters)
   const mutations = useRequestMutations()
   const myTasks = useMyTasks({ page: 1, pageSize: 50, sortBy: 'deadline', sortDirection: 'asc' }, isStudent)
+  const taskOptions = useTasks({ page: 1, pageSize: 50, search: taskSearch || undefined, sortBy: 'deadline', sortDirection: 'asc' }, canReview)
   const students = useStudents({ page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }, canReview)
 
   const updateFilters = (patch: Partial<RequestFilters>) => setSearchParams(filtersToSearch({ ...filters, ...patch }))
 
   const columns = [
-    { key: 'type', header: 'Type', cell: (item: TaskRequest) => <Badge variant={item.type === 'EXTENSION' ? 'info' : 'brand'}>{formatRequestType(item.type)}</Badge> },
-    { key: 'task', header: 'Task', cell: (item: TaskRequest) => <div className="min-w-44"><p className="font-medium">{item.taskTitle ?? 'Task'}</p>{item.requestedByName ? <p className="text-xs text-text-muted">{item.requestedByName}</p> : null}</div> },
+    { key: 'type', header: 'Type', cell: (item: TaskRequest) => <Badge variant={item.type === 'EXTENSION' ? 'info' : 'brand'}>{requestTypeLabels[item.type]}</Badge> },
+    { key: 'task', header: 'Task', cell: (item: TaskRequest) => <div className="min-w-44"><p className="font-medium">{item.taskTitle ?? 'Task title unavailable'}</p>{item.requestedByName ? <p className="text-xs text-text-muted">Requested by {item.requestedByName}</p> : null}{item.type === 'REASSIGNMENT' && item.suggestedStudentName ? <p className="text-xs text-text-muted">Suggested assignee {item.suggestedStudentName}</p> : null}</div> },
     { key: 'status', header: 'Status', cell: (item: TaskRequest) => <RequestStatusBadge status={item.status} /> },
     { key: 'deadline', header: 'Deadline', cell: (item: TaskRequest) => item.requestedDeadline ? formatIstanbulDateTime(item.requestedDeadline) : <MissingData kind="not-set" /> },
     { key: 'created', header: 'Created', cell: (item: TaskRequest) => formatIstanbulDateTime(item.createdAt), className: 'hidden lg:table-cell' },
@@ -51,16 +54,25 @@ export function RequestsPage() {
             <FormField label="Type">{({ id }) => (
               <Select value={filters.type ?? 'any'} onValueChange={(value) => updateFilters({ type: value === 'any' ? undefined : value as RequestType, page: 1 })}>
                 <SelectTrigger id={id}><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="any">Any type</SelectItem>{requestTypes.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectItem value="any">Any type</SelectItem>{requestTypes.map((type) => <SelectItem key={type} value={type}>{requestTypeLabels[type]}</SelectItem>)}</SelectContent>
               </Select>
             )}</FormField>
             <FormField label="Status">{({ id }) => (
               <Select value={filters.status ?? 'any'} onValueChange={(value) => updateFilters({ status: value === 'any' ? undefined : value as RequestStatus, page: 1 })}>
                 <SelectTrigger id={id}><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="any">Any status</SelectItem>{requestStatuses.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectItem value="any">Any status</SelectItem>{requestStatuses.map((status) => <SelectItem key={status} value={status}>{requestStatusLabels[status]}</SelectItem>)}</SelectContent>
               </Select>
             )}</FormField>
-            <FormField label="Task ID">{({ id }) => <Input id={id} value={filters.taskId ?? ''} onChange={(event) => updateFilters({ taskId: event.target.value || undefined, page: 1 })} />}</FormField>
+            <FormField label="Task">{({ id }) => (
+              <Select value={filters.taskId ?? 'any'} onValueChange={(value) => updateFilters({ taskId: value === 'any' ? undefined : value, page: 1 })}>
+                <SelectTrigger id={id}><SelectValue placeholder="Select task" /></SelectTrigger>
+                <SelectContent>
+                  <div className="p-2"><Input aria-label="Search tasks" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Search task title" /></div>
+                  <SelectItem value="any">Any task</SelectItem>
+                  {taskOptions.data?.items.map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}</FormField>
             <div className="self-end"><Button variant="ghost" onClick={() => setSearchParams(new URLSearchParams())}>Clear filters</Button></div>
           </CardContent>
         </Card>
@@ -87,7 +99,6 @@ function RequestCreateForm({ tasks }: { tasks: Task[] }) {
   const [taskId, setTaskId] = useState('')
   const [requestedDeadline, setRequestedDeadline] = useState('')
   const [reason, setReason] = useState('')
-  const [suggestedStudentId, setSuggestedStudentId] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!taskId || !reason.trim()) return
@@ -95,18 +106,18 @@ function RequestCreateForm({ tasks }: { tasks: Task[] }) {
       if (!requestedDeadline) return
       mutations.createExtension.mutate({ taskId, requestedDeadline: new Date(requestedDeadline).toISOString(), reason })
     } else {
-      mutations.createReassignment.mutate({ taskId, reason, suggestedStudentId: suggestedStudentId || undefined })
+      mutations.createReassignment.mutate({ taskId, reason })
     }
   }
   const selectedTask = eligibleTasks.find((task) => task.id === taskId)
   return (
     <form className="space-y-3" onSubmit={submit}>
-      <FormField label="Request type">{({ id }) => <Select value={type} onValueChange={(value) => setType(value as RequestType)}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>}</FormField>
+      <FormField label="Request type">{({ id }) => <Select value={type} onValueChange={(value) => setType(value as RequestType)}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{requestTypes.map((item) => <SelectItem key={item} value={item}>{requestTypeLabels[item]}</SelectItem>)}</SelectContent></Select>}</FormField>
       <FormField label="Task">{({ id }) => <Select value={taskId} disabled={eligibleTasks.length === 0} onValueChange={setTaskId}><SelectTrigger id={id}><SelectValue placeholder="Select assigned task" /></SelectTrigger><SelectContent>{eligibleTasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}</SelectContent></Select>}</FormField>
       {eligibleTasks.length === 0 ? <p className="text-sm text-text-secondary">No active assigned tasks can receive new requests.</p> : null}
       {selectedTask ? <p className="text-xs text-text-secondary">Current deadline: <TaskDeadline task={selectedTask} compact /></p> : null}
       {type === 'EXTENSION' ? <FormField label="Requested deadline" required>{({ id }) => <Input id={id} type="datetime-local" value={requestedDeadline} onChange={(event) => setRequestedDeadline(event.target.value)} />}</FormField> : null}
-      {type === 'REASSIGNMENT' ? <FormField label="Suggested student ID" helperText="Optional. The current API accepts only an ID here.">{({ id }) => <Input id={id} value={suggestedStudentId} onChange={(event) => setSuggestedStudentId(event.target.value)} />}</FormField> : null}
+      {type === 'REASSIGNMENT' ? <p className="text-sm text-text-secondary">A reviewer will choose the new assignee during approval.</p> : null}
       <FormField label="Reason" required>{({ id }) => <Textarea id={id} value={reason} onChange={(event) => setReason(event.target.value)} />}</FormField>
       <Button type="submit" iconBefore={<Send aria-hidden="true" className="h-4 w-4" />} isLoading={mutations.createExtension.isPending || mutations.createReassignment.isPending} disabled={!taskId || !reason.trim() || (type === 'EXTENSION' && !requestedDeadline)}>Submit request</Button>
     </form>
@@ -134,15 +145,7 @@ function RequestActions({ item, canReview, canCancel, students, mutations }: { i
 
 function RequestStatusBadge({ status }: { status: RequestStatus }) {
   const variant = status === 'APPROVED' ? 'success' : status === 'REJECTED' ? 'danger' : status === 'PENDING' ? 'warning' : 'neutral'
-  return <Badge variant={variant}>{formatRequestStatus(status)}</Badge>
-}
-
-function formatRequestType(type: RequestType) {
-  return type === 'EXTENSION' ? 'Extension' : 'Reassignment'
-}
-
-function formatRequestStatus(status: RequestStatus) {
-  return status.charAt(0) + status.slice(1).toLowerCase()
+  return <Badge variant={variant}>{requestStatusLabels[status]}</Badge>
 }
 
 function filtersFromSearch(searchParams: URLSearchParams): RequestFilters {

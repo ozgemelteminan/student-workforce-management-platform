@@ -10,7 +10,7 @@ import { useTemplates } from '../../features/templates/useTemplateQueries'
 import { formatIstanbulDateTime } from '../../lib/date-time'
 
 const schema = z.object({
-  templateId: z.string().optional(),
+  templateId: z.string().trim().min(1, 'Choose a template.'),
   frequency: z.string().trim().min(1).max(120),
   timeZoneId: z.string().trim().min(1).max(120),
   localRunTime: z.string().optional(),
@@ -30,7 +30,7 @@ export function RecurringTasksPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Recurring Tasks" description="Schedule template-based task generation with server-owned recurrence execution." primaryAction={<Button iconBefore={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => setEditing(emptyRecurring())}>New recurring task</Button>} />
+      <PageHeader title="Recurring Tasks" description="Create task schedules from existing templates." primaryAction={<Button iconBefore={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => setEditing(emptyRecurring())}>New recurring task</Button>} />
       <Card>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -82,14 +82,14 @@ function RecurringDialog({ recurring, templates, pending, onClose, onSubmit }: {
   return (
     <Dialog open={Boolean(recurring)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{recurring?.id ? 'Edit recurring task' : 'New recurring task'}</DialogTitle><DialogDescription>Use the exact recurrence fields supported by the API.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{recurring?.id ? 'Edit recurring task' : 'New recurring task'}</DialogTitle><DialogDescription>Choose a template and schedule when the next task should be created.</DialogDescription></DialogHeader>
         <form className="space-y-4" onSubmit={form.handleSubmit((values) => onSubmit({ ...values, localRunTime: values.localRunTime || undefined }))}>
-          {!recurring?.id ? <Label title="Template"><select className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm" {...form.register('templateId')}>{templates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}</select></Label> : null}
+          {!recurring?.id ? <Label title="Template" error={form.formState.errors.templateId?.message}>{templates.length ? <select className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm" {...form.register('templateId')}>{templates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}</select> : <div className="rounded-md border border-border bg-surface-secondary px-3 py-2 text-sm text-text-secondary">No templates available. Create a template first.</div>}</Label> : null}
           <Label title="Frequency" error={form.formState.errors.frequency?.message}><Input placeholder="Daily" {...form.register('frequency')} /></Label>
-          <Label title="Time zone" error={form.formState.errors.timeZoneId?.message}><Input {...form.register('timeZoneId')} /></Label>
+          <Label title="Time zone" error={form.formState.errors.timeZoneId?.message}><Input readOnly className="bg-surface-secondary" {...form.register('timeZoneId')} /></Label>
           <Label title="Local run time"><Input placeholder="09:00" {...form.register('localRunTime')} /></Label>
-          <Label title="Next run UTC" error={form.formState.errors.nextRunAt?.message}><Input placeholder="2026-08-14T06:00:00Z" {...form.register('nextRunAt')} /></Label>
-          <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" isLoading={pending}>Save</Button></DialogFooter>
+          <Label title="Next run" error={form.formState.errors.nextRunAt?.message}><Input placeholder="2026-08-14T09:00" type="datetime-local" value={toLocalDateTimeInput(form.watch('nextRunAt'))} onChange={(event) => form.setValue('nextRunAt', event.target.value ? new Date(event.target.value).toISOString() : '', { shouldDirty: true, shouldValidate: true })} /><span className="block text-xs text-text-secondary">{form.watch('nextRunAt') ? `Europe/Istanbul preview: ${formatIstanbulDateTime(form.watch('nextRunAt'))}` : 'Choose the next scheduled run time.'}</span></Label>
+          <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" isLoading={pending} disabled={!recurring?.id && templates.length === 0}>Save</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -102,4 +102,11 @@ function Label({ title, error, children }: { title: string; error?: string; chil
 
 function emptyRecurring(): RecurringTask {
   return { id: '', templateId: '', frequency: '', timeZoneId: 'Europe/Istanbul', nextRunAt: '', isActive: true, createdById: '', concurrencyToken: '', createdAt: new Date().toISOString() }
+}
+
+function toLocalDateTimeInput(value: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }

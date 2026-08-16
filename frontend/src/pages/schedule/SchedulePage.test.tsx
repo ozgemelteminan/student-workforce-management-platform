@@ -60,6 +60,18 @@ describe('SchedulePage availability workflow', () => {
     expect(screen.queryByText('AVAILABLEAVAILABLEUNAVAILABLEPREFERRED')).not.toBeInTheDocument()
   })
 
+  it('shows only the select-student prompt before staff chooses a student', () => {
+    authState.roles = ['ADMIN']
+    useCurrentStudent.mockReturnValue({ data: undefined })
+    useStudents.mockReturnValue({ data: { items: [{ id: 'student-2', firstName: 'Ada', lastName: 'Lovelace' }] } })
+
+    render(<SchedulePage />)
+
+    expect(screen.getByText('Select a student to view schedule and availability.')).toBeInTheDocument()
+    expect(screen.queryByText('No course schedule entries.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No availability entries.')).not.toBeInTheDocument()
+  })
+
   it('shows local validation for invalid availability time ranges', () => {
     render(<SchedulePage />)
 

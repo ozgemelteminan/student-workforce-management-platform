@@ -1,7 +1,7 @@
 import { differenceInCalendarDays } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
 import { DISPLAY_TIME_ZONE, formatIstanbulDate, formatIstanbulDateTime } from '../../lib/date-time'
-import type { AssignmentMode, AssignmentStatus, FileStatus, SubmissionStatus, Task, TaskPriority, TaskStatus } from './types'
+import type { AssignmentMode, AssignmentStatus, FileStatus, SubmissionStatus, Task, TaskFilters, TaskPriority, TaskStatus } from './types'
 
 export const statusLabels: Record<TaskStatus, string> = {
   ASSIGNED: 'Assigned',
@@ -47,6 +47,19 @@ export const priorityLabels: Record<TaskPriority, string> = {
   MEDIUM: 'Medium',
   HIGH: 'High',
   URGENT: 'Urgent',
+}
+
+export const difficultyLabels: Record<Task['difficulty'], string> = {
+  EASY: 'Easy',
+  MEDIUM: 'Medium',
+  HARD: 'Hard',
+}
+
+export const taskSortLabels: Record<NonNullable<TaskFilters['sortBy']>, string> = {
+  deadline: 'Deadline',
+  priority: 'Priority',
+  created: 'Created date',
+  workload: 'Workload',
 }
 
 export function statusVariant(status: TaskStatus) {

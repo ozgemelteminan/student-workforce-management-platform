@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   assignmentModeLabels,
   assignmentStatusLabels,
+  difficultyLabels,
   fileStatusLabels,
+  priorityLabels,
   submissionStatusLabels,
   statusLabels,
+  taskSortLabels,
 } from './taskPresentation'
 
 describe('task status presentation', () => {
@@ -15,6 +18,9 @@ describe('task status presentation', () => {
     expect(fileStatusLabels.UPLOAD_PENDING).toBe('Upload pending')
     expect(assignmentModeLabels.MARKETPLACE).toBe('Task pool')
     expect(assignmentStatusLabels.REASSIGNED).toBe('Reassigned')
+    expect(priorityLabels.MEDIUM).toBe('Medium')
+    expect(difficultyLabels.MEDIUM).toBe('Medium')
+    expect(taskSortLabels.created).toBe('Created date')
 
     const labels = [
       ...Object.values(statusLabels),
@@ -22,6 +28,9 @@ describe('task status presentation', () => {
       ...Object.values(fileStatusLabels),
       ...Object.values(assignmentModeLabels),
       ...Object.values(assignmentStatusLabels),
+      ...Object.values(priorityLabels),
+      ...Object.values(difficultyLabels),
+      ...Object.values(taskSortLabels),
     ]
 
     expect(labels.every((label) => !label.includes('_'))).toBe(true)

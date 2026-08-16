@@ -69,7 +69,7 @@ export function TaskSummary({ task, checklist }: { task: Task; checklist?: TaskC
 }
 
 export function formatTaskAssignee(task: Pick<Task, 'assignedStudentId' | 'assignedStudentName'>) {
-  return task.assignedStudentName || (task.assignedStudentId ? 'Assigned student' : 'Not set')
+  return task.assignedStudentName || (task.assignedStudentId ? 'Name unavailable' : 'Not set')
 }
 
 export function TaskActionsMenu({ task, canEdit, onCancel }: { task: Task; canEdit: boolean; onCancel?: () => void }) {

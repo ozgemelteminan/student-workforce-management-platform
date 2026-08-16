@@ -1,5 +1,5 @@
 import { CalendarCheck, Plus, RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Textarea } from '../../components/ui'
 import { campusPresenceLabels, meetingStatusLabels, meetingTypeLabels } from '../../features/collaboration/collaborationPresentation'
@@ -66,12 +66,12 @@ export function MeetingsPage() {
               <CardContent className="space-y-3">
                 <h2 className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4" /> New meeting</h2>
                 <form className="grid gap-2 lg:grid-cols-2" onSubmit={(event) => { event.preventDefault(); if (create.title && create.responseDeadline && create.participantStudentIds.length) void mutations.createMeeting.mutateAsync({ ...create, responseDeadline: toApiInstant(create.responseDeadline), location: create.location || undefined, agenda: create.agenda || undefined }) }}>
-                  <Input aria-label="Meeting title" value={create.title} onChange={(event) => setCreate((value) => ({ ...value, title: event.target.value }))} placeholder="Title" />
-                  <Select value={create.type} onValueChange={(type) => setCreate((value) => ({ ...value, type: type as MeetingType }))}><SelectTrigger aria-label="Meeting type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN_PERSON">{meetingTypeLabels.IN_PERSON}</SelectItem><SelectItem value="ONLINE">{meetingTypeLabels.ONLINE}</SelectItem></SelectContent></Select>
-                  <Input aria-label="Response deadline" type="datetime-local" value={create.responseDeadline} onChange={(event) => setCreate((value) => ({ ...value, responseDeadline: event.target.value }))} />
-                  <Select value={create.participantStudentIds[0] ?? ''} onValueChange={(studentId) => setCreate((value) => ({ ...value, participantStudentIds: [studentId] }))}><SelectTrigger aria-label="Participant"><SelectValue placeholder="Participant" /></SelectTrigger><SelectContent>{lookups.students.data?.items.map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName}</SelectItem>)}</SelectContent></Select>
-                  <Input aria-label="Location" value={create.location} onChange={(event) => setCreate((value) => ({ ...value, location: event.target.value }))} placeholder="Location or link" />
-                  <Textarea aria-label="Agenda" value={create.agenda} onChange={(event) => setCreate((value) => ({ ...value, agenda: event.target.value }))} placeholder="Agenda" />
+                  <Label title="Title"><Input aria-label="Title" value={create.title} onChange={(event) => setCreate((value) => ({ ...value, title: event.target.value }))} placeholder="Planning meeting" /></Label>
+                  <Label title="Mode"><Select value={create.type} onValueChange={(type) => setCreate((value) => ({ ...value, type: type as MeetingType }))}><SelectTrigger aria-label="Mode"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN_PERSON">{meetingTypeLabels.IN_PERSON}</SelectItem><SelectItem value="ONLINE">{meetingTypeLabels.ONLINE}</SelectItem></SelectContent></Select></Label>
+                  <Label title="Date & time"><Input aria-label="Date & time" type="datetime-local" value={create.responseDeadline} onChange={(event) => setCreate((value) => ({ ...value, responseDeadline: event.target.value }))} /></Label>
+                  <Label title="Participants"><Select value={create.participantStudentIds[0] ?? ''} onValueChange={(studentId) => setCreate((value) => ({ ...value, participantStudentIds: [studentId] }))}><SelectTrigger aria-label="Participants"><SelectValue placeholder="Participant" /></SelectTrigger><SelectContent>{lookups.students.data?.items.map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName}</SelectItem>)}</SelectContent></Select></Label>
+                  <Label title="Location / link"><Input aria-label="Location / link" value={create.location} onChange={(event) => setCreate((value) => ({ ...value, location: event.target.value }))} placeholder="Room or meeting link" /></Label>
+                  <Label title="Agenda"><Textarea aria-label="Agenda" value={create.agenda} onChange={(event) => setCreate((value) => ({ ...value, agenda: event.target.value }))} placeholder="Agenda" /></Label>
                   <Button type="submit" className="lg:col-span-2" isLoading={mutations.createMeeting.isPending}>Create meeting</Button>
                 </form>
               </CardContent>
@@ -79,11 +79,11 @@ export function MeetingsPage() {
           ) : null}
           <Card>
             <CardContent className="space-y-4">
-              {!selectedId ? <EmptyState title="Select a meeting." description="Choose a meeting from the queue to manage responses, slots, and action items." className="min-h-56" /> : null}
+              {!selectedId ? <EmptyState title="Select a meeting." description="Choose a meeting from the queue." className="min-h-32" /> : null}
               {selected.isLoading ? <Skeleton className="h-56" /> : null}
               {selected.data ? (
                 <div className="space-y-4">
-                  <div><div className="flex flex-wrap gap-2"><Badge>{meetingStatusLabels[selected.data.status]}</Badge><Badge variant="info">{meetingTypeLabels[selected.data.type]}</Badge></div><h2 className="mt-2 text-base font-semibold">{selected.data.title}</h2><p className="text-sm text-text-secondary">Deadline {formatIstanbulDateTime(selected.data.responseDeadline)}</p></div>
+                  <div><div className="flex flex-wrap gap-2"><Badge>{meetingStatusLabels[selected.data.status]}</Badge><Badge variant="info">{meetingTypeLabels[selected.data.type]}</Badge></div><h2 className="mt-2 text-base font-semibold">{selected.data.title}</h2><p className="text-sm text-text-secondary">{selected.data.status === 'CONFIRMED' && selected.data.confirmedStartAt ? `Scheduled ${formatIstanbulDateTime(selected.data.confirmedStartAt)}` : `Respond by ${formatIstanbulDateTime(selected.data.responseDeadline)}`}</p></div>
                   <form className="grid gap-2 md:grid-cols-[12rem_1fr_1fr]" onSubmit={(event) => { event.preventDefault(); if (response.startAt && response.endAt) void mutations.respondMeeting.mutate({ id: selected.data.id, campusPresence: response.campusPresence, availableRangesJson: JSON.stringify([{ startAt: toApiInstant(response.startAt), endAt: toApiInstant(response.endAt) }]), note: response.note || undefined }) }}>
                     <Select value={response.campusPresence} onValueChange={(campusPresence) => setResponse((value) => ({ ...value, campusPresence: campusPresence as CampusPresence }))}><SelectTrigger aria-label="Campus presence"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ON_CAMPUS">{campusPresenceLabels.ON_CAMPUS}</SelectItem><SelectItem value="OFF_CAMPUS">{campusPresenceLabels.OFF_CAMPUS}</SelectItem><SelectItem value="UNSURE">{campusPresenceLabels.UNSURE}</SelectItem></SelectContent></Select>
                     <Input aria-label="Available from" type="datetime-local" value={response.startAt} onChange={(event) => setResponse((value) => ({ ...value, startAt: event.target.value }))} />
@@ -105,4 +105,8 @@ export function MeetingsPage() {
 
 function toApiInstant(value: string) {
   return new Date(value).toISOString()
+}
+
+function Label({ title, children }: { title: string; children: ReactNode }) {
+  return <label className="space-y-1.5 text-sm font-medium text-text-primary">{title}{children}</label>
 }

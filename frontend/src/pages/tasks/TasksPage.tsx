@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, CardContent, DataTable, ErrorState, Pagination, PageHeader, SearchInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../../components/ui'
 import { formatTaskAssignee, TaskActionsMenu, TaskDeadline, TaskEmpty, TaskPriorityBadge, TaskStatusBadge, TaskSummary } from '../../features/tasks/components'
 import { filtersFromSearchParams, filtersToSearchParams, type TaskView } from '../../features/tasks/taskFilters'
-import { formatDuration, statusLabels } from '../../features/tasks/taskPresentation'
+import { formatDuration, statusLabels, taskSortLabels } from '../../features/tasks/taskPresentation'
 import type { Task, TaskFilters } from '../../features/tasks/types'
 import { useTask, useTaskCollections, useTasks, useMyTasks } from '../../features/tasks/useTaskQueries'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -76,7 +76,7 @@ export function TasksPage() {
               </Select>
               <Select value={filters.sortBy ?? 'deadline'} onValueChange={(value) => updateFilters({ sortBy: value as TaskFilters['sortBy'], page: 1 })}>
                 <SelectTrigger aria-label="Sort field"><SelectValue /></SelectTrigger>
-                <SelectContent>{['deadline', 'priority', 'created', 'workload'].map((sort) => <SelectItem key={sort} value={sort}>{sort}</SelectItem>)}</SelectContent>
+                <SelectContent>{['deadline', 'priority', 'created', 'workload'].map((sort) => <SelectItem key={sort} value={sort}>{taskSortLabels[sort as NonNullable<TaskFilters['sortBy']>]}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={filters.sortDirection ?? 'asc'} onValueChange={(value) => updateFilters({ sortDirection: value as 'asc' | 'desc', page: 1 })}>
                 <SelectTrigger aria-label="Sort direction"><SelectValue /></SelectTrigger>

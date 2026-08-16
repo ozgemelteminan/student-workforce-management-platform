@@ -1,6 +1,7 @@
 import { CalendarOff, Clock, RefreshCw, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Badge, Button, Card, CardContent, EmptyState, ErrorState, Input, PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Textarea } from '../../components/ui'
+import { timesheetStatusLabels } from '../../features/collaboration/collaborationPresentation'
 import { useCurrentTimesheet, useCollaborationMutations, useTimesheets, useUnavailability } from '../../features/collaboration/useCollaborationQueries'
 import { useCurrentStudent } from '../../features/students/useStudentQueries'
 import { useMyTasks } from '../../features/tasks/useTaskQueries'
@@ -41,7 +42,7 @@ export function WorkloadPage() {
                   <div className="space-y-4">
                     <div className="grid gap-3 md:grid-cols-4">
                       <Metric label="Week" value={`${formatDateOnly(currentWeek.data.weekStartDate)} - ${formatDateOnly(currentWeek.data.weekEndDate)}`} />
-                      <Metric label="Status" value={currentWeek.data.status} />
+                      <Metric label="Status" value={timesheetStatusLabels[currentWeek.data.status]} />
                       <Metric label="Logged" value={`${currentWeek.data.totalMinutes} min`} />
                       <Metric label="Target" value={currentWeek.data.targetMinutes > 0 ? `${currentWeek.data.targetMinutes} min` : 'Not configured'} />
                     </div>
@@ -74,18 +75,18 @@ export function WorkloadPage() {
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <SectionHeading icon={<Clock className="h-4 w-4" />} title="Timesheet review" />
-                  <Select value={status} onValueChange={(value) => setStatus(value as TimesheetStatus | 'ALL')}><SelectTrigger className="w-48" aria-label="Timesheet status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All</SelectItem>{statuses.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select>
+                  <Select value={status} onValueChange={(value) => setStatus(value as TimesheetStatus | 'ALL')}><SelectTrigger className="w-48" aria-label="Timesheet status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All</SelectItem>{statuses.map((item) => <SelectItem key={item} value={item}>{timesheetStatusLabels[item]}</SelectItem>)}</SelectContent></Select>
                 </div>
                 {timesheets.isError ? <ErrorState title="Timesheets could not be loaded." description="Refresh the review queue or check your access." retryAction={<Button variant="outline" onClick={() => void timesheets.refetch()}>Retry</Button>} /> : null}
                 {timesheets.isLoading ? <Skeleton className="h-52" /> : null}
                 <div className="divide-y divide-border rounded-lg border border-border">
                   {timesheets.data?.items.map((week) => (
                     <div key={week.id} className="grid gap-3 px-3 py-3 text-sm lg:grid-cols-[1fr_auto] lg:items-center">
-                      <div><p className="font-medium">{formatDateOnly(week.weekStartDate)} - {formatDateOnly(week.weekEndDate)} · {week.totalMinutes} min</p><p className="text-text-secondary">Student {week.studentId.slice(0, 8)} · {week.status}</p></div>
-                      {week.status === 'SUBMITTED' ? <div className="flex gap-2"><Button size="sm" onClick={() => mutations.reviewWeek.mutate({ id: week.id, status: 'APPROVED' })}>Approve</Button><Button size="sm" variant="outline" onClick={() => mutations.reviewWeek.mutate({ id: week.id, status: 'NEEDS_CORRECTION', reviewerComment: 'Please revise this week.' })}>Needs correction</Button></div> : <Badge>{week.status}</Badge>}
+                      <div><p className="font-medium">{formatDateOnly(week.weekStartDate)} - {formatDateOnly(week.weekEndDate)} · {week.totalMinutes} min</p><p className="text-text-secondary">Student {week.studentId.slice(0, 8)} · {timesheetStatusLabels[week.status]}</p></div>
+                      {week.status === 'SUBMITTED' ? <div className="flex gap-2"><Button size="sm" onClick={() => mutations.reviewWeek.mutate({ id: week.id, status: 'APPROVED' })}>Approve</Button><Button size="sm" variant="outline" onClick={() => mutations.reviewWeek.mutate({ id: week.id, status: 'NEEDS_CORRECTION', reviewerComment: 'Please revise this week.' })}>Needs correction</Button></div> : <Badge>{timesheetStatusLabels[week.status]}</Badge>}
                     </div>
                   ))}
-                  {!timesheets.isLoading && !timesheets.data?.items.length ? <EmptyState title="No timesheets found." className="min-h-32" /> : null}
+                  {!timesheets.isLoading && !timesheets.data?.items.length ? <EmptyState title={status === 'SUBMITTED' ? 'No submitted timesheets.' : 'No timesheets found.'} className="min-h-32" /> : null}
                 </div>
               </CardContent>
             </Card>
@@ -95,10 +96,10 @@ export function WorkloadPage() {
           <CardContent className="space-y-4">
             <SectionHeading icon={<CalendarOff className="h-4 w-4" />} title="Temporary unavailability" />
             <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); if (away.startAt && away.endAt) void mutations.createUnavailability.mutateAsync({ startAt: toApiInstant(away.startAt), endAt: toApiInstant(away.endAt), category: away.category, note: away.note || undefined }) }}>
-              <Input aria-label="Unavailable from" type="datetime-local" value={away.startAt} onChange={(event) => setAway((value) => ({ ...value, startAt: event.target.value }))} />
-              <Input aria-label="Unavailable until" type="datetime-local" value={away.endAt} onChange={(event) => setAway((value) => ({ ...value, endAt: event.target.value }))} />
-              <Input aria-label="Unavailable category" value={away.category} onChange={(event) => setAway((value) => ({ ...value, category: event.target.value }))} />
-              <Textarea aria-label="Unavailable note" value={away.note} onChange={(event) => setAway((value) => ({ ...value, note: event.target.value }))} />
+              <Label title="Start"><Input aria-label="Start" type="datetime-local" value={away.startAt} onChange={(event) => setAway((value) => ({ ...value, startAt: event.target.value }))} /></Label>
+              <Label title="End"><Input aria-label="End" type="datetime-local" value={away.endAt} onChange={(event) => setAway((value) => ({ ...value, endAt: event.target.value }))} /></Label>
+              <Label title="Unavailability type"><Input aria-label="Unavailability type" value={away.category} onChange={(event) => setAway((value) => ({ ...value, category: event.target.value }))} /></Label>
+              <Label title="Reason"><Textarea aria-label="Reason" value={away.note} onChange={(event) => setAway((value) => ({ ...value, note: event.target.value }))} /></Label>
               <Button type="submit" className="w-full" isLoading={mutations.createUnavailability.isPending}>Save unavailability</Button>
             </form>
             <div className="space-y-2">
@@ -118,6 +119,10 @@ function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md border border-border bg-surface-secondary p-3"><dt className="text-xs text-text-muted">{label}</dt><dd className="mt-1 text-sm font-semibold">{value}</dd></div>
+}
+
+function Label({ title, children }: { title: string; children: ReactNode }) {
+  return <label className="space-y-1.5 text-sm font-medium text-text-primary">{title}{children}</label>
 }
 
 function toApiInstant(value: string) {

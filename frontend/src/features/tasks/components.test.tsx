@@ -33,7 +33,7 @@ describe('task presentation components', () => {
   })
 
   it('keeps assigned student ids internal when no display name is available', () => {
-    expect(formatTaskAssignee({ assignedStudentId, assignedStudentName: null })).toBe('Assigned student')
+    expect(formatTaskAssignee({ assignedStudentId, assignedStudentName: null })).toBe('Name unavailable')
     expect(formatTaskAssignee({ assignedStudentId: undefined, assignedStudentName: null })).toBe('Not set')
   })
 })

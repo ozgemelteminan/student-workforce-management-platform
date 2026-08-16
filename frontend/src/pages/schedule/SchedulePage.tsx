@@ -39,7 +39,7 @@ export function SchedulePage() {
   const availabilityColumns = [
     { key: 'day', header: 'Day', cell: (item: Availability) => item.dayOfWeek },
     { key: 'time', header: 'Time', cell: (item: Availability) => formatTimeRange(item.startTime, item.endTime) },
-    { key: 'status', header: 'Status', cell: (item: Availability) => <Badge variant={item.status === 'AVAILABLE' ? 'success' : item.status === 'PREFERRED' ? 'info' : 'neutral'}>{item.status}</Badge> },
+    { key: 'status', header: 'Status', cell: (item: Availability) => <Badge variant={item.status === 'AVAILABLE' ? 'success' : item.status === 'PREFERRED' ? 'info' : 'neutral'}>{availabilityStatusLabels[item.status]}</Badge> },
     { key: 'reason', header: 'Reason', cell: (item: Availability) => item.reason || <MissingData /> },
   ]
 
@@ -57,11 +57,11 @@ export function SchedulePage() {
           <FormField label="Semester">{({ id }) => (
             <Select value={effectiveSemesterId ?? ''} onValueChange={setSemesterId}>
               <SelectTrigger id={id}><SelectValue placeholder="Select semester" /></SelectTrigger>
-              <SelectContent>{(semesters.data ?? []).map((semester) => <SelectItem key={semester.id} value={semester.id}>{semester.name} ({semester.status})</SelectItem>)}</SelectContent>
+              <SelectContent>{(semesters.data ?? []).map((semester) => <SelectItem key={semester.id} value={semester.id}>{semester.name} ({formatSemesterStatus(semester.status)})</SelectItem>)}</SelectContent>
             </Select>
           )}</FormField>
           <div className="self-end rounded-md border border-border bg-surface-secondary px-3 py-2 text-sm text-text-secondary">
-            Active semester: {activeSemester.data ? `${activeSemester.data.name} ${formatDateOnly(activeSemester.data.startDate)}-${formatDateOnly(activeSemester.data.endDate)}` : <MissingData kind="not-set" />}
+            Active semester: {activeSemester.data ? `${activeSemester.data.name} · ${formatDateOnly(activeSemester.data.startDate)} to ${formatDateOnly(activeSemester.data.endDate)}` : <MissingData kind="not-set" />}
           </div>
         </CardContent>
       </Card>
@@ -76,7 +76,7 @@ export function SchedulePage() {
           onRetry={() => { void collections.schedule.refetch(); void collections.availability.refetch() }}
         />
       ) : null}
-      <div className="grid gap-4 xl:grid-cols-2">
+      {studentId ? <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader><h2 className="text-sm font-semibold">Course schedule</h2></CardHeader>
           <CardContent className="space-y-4">
@@ -109,7 +109,7 @@ export function SchedulePage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div> : null}
     </div>
   )
 }
@@ -194,7 +194,7 @@ function AvailabilityForm({ studentId, semesterId, editing, onDone }: { studentI
       <FormField label="Day">{({ id }) => <Select value={form.dayOfWeek} onValueChange={(value) => setForm({ ...form, dayOfWeek: value as DayOfWeek })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{dayOfWeekValues.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select>}</FormField>
       <FormField label="Start" error={timeError}>{({ id, describedBy, invalid }) => <Input id={id} type="time" value={form.startTime} invalid={invalid} aria-describedby={describedBy} onChange={(event) => setForm({ ...form, startTime: event.target.value })} />}</FormField>
       <FormField label="End" error={timeError}>{({ id, describedBy, invalid }) => <Input id={id} type="time" value={form.endTime} invalid={invalid} aria-describedby={describedBy} onChange={(event) => setForm({ ...form, endTime: event.target.value })} />}</FormField>
-      <FormField label="Status">{({ id }) => <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as AvailabilityStatus })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{availabilityStatuses.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select>}</FormField>
+      <FormField label="Status">{({ id }) => <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as AvailabilityStatus })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{availabilityStatuses.map((status) => <SelectItem key={status} value={status}>{availabilityStatusLabels[status]}</SelectItem>)}</SelectContent></Select>}</FormField>
       <FormField label="Reason" className="md:col-span-2">{({ id }) => <Textarea id={id} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />}</FormField>
       {formError ? <p className="text-sm text-destructive md:col-span-3" role="alert">{formError}</p> : null}
       <div className="flex gap-2">
@@ -207,4 +207,14 @@ function AvailabilityForm({ studentId, semesterId, editing, onDone }: { studentI
 
 function firstValidationMessage(error: ApiError) {
   return Object.values(error.problem.validationErrors).flat()[0]
+}
+
+const availabilityStatusLabels: Record<AvailabilityStatus, string> = {
+  AVAILABLE: 'Available',
+  PREFERRED: 'Preferred',
+  UNAVAILABLE: 'Unavailable',
+}
+
+function formatSemesterStatus(status: string) {
+  return status.charAt(0) + status.slice(1).toLowerCase()
 }

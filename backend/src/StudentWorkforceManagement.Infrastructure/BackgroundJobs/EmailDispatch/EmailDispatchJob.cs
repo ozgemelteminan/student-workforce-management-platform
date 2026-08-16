@@ -25,9 +25,11 @@ public sealed class EmailDispatchJob(
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
+
         var deliveries = await dbContext.EmailDeliveries
             .Where(item =>
-                (item.Status == EmailDeliveryStatus.QUEUED || item.Status == EmailDeliveryStatus.FAILED) &&
+                (item.Status == EmailDeliveryStatus.QUEUED ||
+                 item.Status == EmailDeliveryStatus.FAILED) &&
                 item.Attempts < _options.MaxAttempts &&
                 (item.NextRetryAt == null || item.NextRetryAt <= now))
             .OrderBy(item => item.CreatedAt)
@@ -40,23 +42,42 @@ public sealed class EmailDispatchJob(
             delivery.Attempts += 1;
             delivery.LastAttemptAt = now;
         }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var sent = 0;
+
         foreach (var delivery in deliveries)
         {
             EmailProviderResult result;
+            var stage = "message-preparation";
+
             try
             {
                 var message = messageFactory.FromDelivery(delivery);
-                result = await emailProvider.SendAsync(message, cancellationToken);
+
+                stage = "provider-send";
+
+                result = await emailProvider.SendAsync(
+                    message,
+                    cancellationToken);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Email provider failed for delivery {DeliveryId}", delivery.Id);
-                result = new EmailProviderResult(false, null, "Email delivery failed.");
+                logger.LogWarning(
+                ex,
+                "Email delivery failed at {Stage} ({ExceptionType}) for delivery {DeliveryId}",
+                stage,
+                ex.GetType().Name,
+                delivery.Id);
+                
+                result = new EmailProviderResult(
+                false,
+                null,
+                
+                "Email delivery failed.");
+                
             }
-
             if (result.Accepted)
             {
                 delivery.Status = EmailDeliveryStatus.SENT;
@@ -65,18 +86,38 @@ public sealed class EmailDispatchJob(
                 delivery.FailureReason = null;
                 delivery.SentAt = clock.UtcNow;
                 delivery.NextRetryAt = null;
-                delivery.TemplateDataJson = EmailMessageFactory.RemoveProtectedTemplateData(delivery.TemplateDataJson);
+
+                delivery.TemplateDataJson =
+                    EmailMessageFactory.RemoveProtectedTemplateData(
+                        delivery.TemplateDataJson);
+
                 sent += 1;
             }
             else
             {
-                delivery.Status = delivery.Attempts >= _options.MaxAttempts ? EmailDeliveryStatus.FAILED : EmailDeliveryStatus.QUEUED;
+                delivery.Status =
+                    delivery.Attempts >= _options.MaxAttempts
+                        ? EmailDeliveryStatus.FAILED
+                        : EmailDeliveryStatus.QUEUED;
+
                 delivery.FailureReason = result.FailureReason;
-                delivery.NextRetryAt = delivery.Attempts >= _options.MaxAttempts ? null : clock.UtcNow.AddMinutes(_options.BaseRetryDelayMinutes * Math.Pow(2, delivery.Attempts - 1));
+
+                delivery.NextRetryAt =
+                    delivery.Attempts >= _options.MaxAttempts
+                        ? null
+                        : clock.UtcNow.AddMinutes(
+                            _options.BaseRetryDelayMinutes *
+                            Math.Pow(2, delivery.Attempts - 1));
             }
         }
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("EmailDispatchJob processed {Count} deliveries and sent {Sent}", deliveries.Count, sent);
+
+        logger.LogInformation(
+            "EmailDispatchJob processed {Count} deliveries and sent {Sent}",
+            deliveries.Count,
+            sent);
+
         return sent;
     }
 }

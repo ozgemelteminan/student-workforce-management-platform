@@ -32,13 +32,13 @@ export function ReviewsPage() {
   const approve = (event: FormEvent) => {
     event.preventDefault()
     if (!submission) return
-    mutations.approve.mutate({ submissionId: submission.id, reviewerComment: comment || undefined })
+    mutations.approve.mutate({ submissionId: submission.id, reviewerComment: comment || undefined, taskId: selected?.task.id })
   }
 
   const revision = (event: FormEvent) => {
     event.preventDefault()
     if (!submission || !comment.trim()) return
-    mutations.requestRevision.mutate({ submissionId: submission.id, reviewerComment: comment })
+    mutations.requestRevision.mutate({ submissionId: submission.id, reviewerComment: comment, taskId: selected?.task.id })
   }
 
   return (

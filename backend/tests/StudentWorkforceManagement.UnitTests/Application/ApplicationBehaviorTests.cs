@@ -30,6 +30,15 @@ public sealed class ApplicationBehaviorTests
     }
 
     [Fact]
+    public void Task_state_machine_allows_reviewer_revision_request_but_not_task_manager_by_default()
+    {
+        var stateMachine = new TaskStateMachine();
+
+        stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.REVIEWER], isAssignedStudent: false);
+        Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.TASK_MANAGER], isAssignedStudent: false));
+    }
+
+    [Fact]
     public void Skill_matching_respects_minimum_level_order()
     {
         var service = new SkillMatchingService();

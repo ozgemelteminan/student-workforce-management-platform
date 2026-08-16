@@ -1,11 +1,13 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StudentWorkforceManagement.Application.Common.Events;
 using StudentWorkforceManagement.Application.Common.Exceptions;
 using StudentWorkforceManagement.Application.Common.Security;
 using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
+using StudentWorkforceManagement.Application.Files.Services;
 using StudentWorkforceManagement.Application.Collaboration.Commands;
 using StudentWorkforceManagement.Application.Collaboration.DTOs;
 using StudentWorkforceManagement.Application.Collaboration.Queries;
@@ -16,6 +18,7 @@ using StudentWorkforceManagement.Application.Notifications.Queries.GetNotificati
 using StudentWorkforceManagement.Application.Skills.Commands;
 using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
 using StudentWorkforceManagement.Application.Students.Commands;
+using StudentWorkforceManagement.Application.Submissions.Commands.CompleteSubmissionUpload;
 using StudentWorkforceManagement.Application.Submissions.Queries.GetSubmission;
 using StudentWorkforceManagement.Application.Submissions.Commands.ReviewSubmission;
 using StudentWorkforceManagement.Application.Tasks.Commands.AssignTask;
@@ -257,6 +260,68 @@ public sealed class ApplicationWorkflowTests
         var handler = new ReviewSubmissionCommandHandler(context, currentUser, new TaskStateMachine(), new AuditService(context, currentUser), new NoOpEventQueue(), new FakeClock());
 
         await Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(new ApproveSubmissionCommand(submission.Id), CancellationToken.None));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Reviewer_can_request_revision_and_student_can_read_requested_changes()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var reviewerId = Guid.NewGuid();
+        var task = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.SUBMITTED_FOR_REVIEW);
+        var submission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = student.Id, Status = SubmissionStatus.SUBMITTED_FOR_REVIEW, SubmittedAt = DateTimeOffset.UtcNow };
+        context.TaskSubmissions.Add(submission);
+        await context.SaveChangesAsync();
+        var reviewer = new FakeCurrentUser(reviewerId, null, UserRole.REVIEWER);
+        var handler = new ReviewSubmissionCommandHandler(context, reviewer, new TaskStateMachine(), new AuditService(context, reviewer), new NoOpEventQueue(), new FakeClock());
+
+        var review = await handler.Handle(new RequestSubmissionRevisionCommand(submission.Id, "Please add the missing appendix."), CancellationToken.None);
+        await context.SaveChangesAsync();
+        var visibleSubmissions = await new GetSubmissionQueryHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT), new FakeStorage()).Handle(new GetTaskSubmissionsQuery(task.Id), CancellationToken.None);
+
+        Assert.False(review.IsApproved);
+        Assert.Equal("Please add the missing appendix.", review.ReviewerComment);
+        Assert.Equal(TaskStatus.IN_PROGRESS, task.Status);
+        Assert.Equal(SubmissionStatus.REVISION_REQUESTED, submission.Status);
+        Assert.Equal("Please add the missing appendix.", Assert.Single(visibleSubmissions).LatestReviewerComment);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Student_can_upload_new_version_for_revision_requested_submission_and_keep_previous_versions()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var task = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.IN_PROGRESS);
+        var submission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = student.Id, Status = SubmissionStatus.REVISION_REQUESTED, SubmittedAt = DateTimeOffset.UtcNow.AddDays(-1) };
+        var previous = new SubmissionVersion
+        {
+            Id = Guid.NewGuid(),
+            TaskSubmissionId = submission.Id,
+            VersionNumber = 1,
+            File = new StudentWorkforceManagement.Domain.ValueObjects.FileMetadata { FileName = "Previous.pdf", StorageKey = "task-submissions/previous.pdf", FileSize = 1, MimeType = "application/pdf", FileExtension = ".pdf" },
+            FileStatus = FileStatus.CONFIRMED,
+            UploadedById = student.Id,
+            UploadedAt = DateTimeOffset.UtcNow.AddDays(-1),
+            ConfirmedAt = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        context.TaskSubmissions.Add(submission);
+        context.SubmissionVersions.Add(previous);
+        await context.SaveChangesAsync();
+        var currentUser = new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT);
+        var uploadHandler = new CompleteSubmissionUploadCommandHandler(context, currentUser, new FakeStorage(), CreateUploadPolicy(), new FakeClock());
+
+        var intent = await uploadHandler.Handle(new InitiateSubmissionUploadCommand(task.Id, "Revised.pdf", 1, "application/pdf", ".pdf", null), CancellationToken.None);
+        await context.SaveChangesAsync();
+        await uploadHandler.Handle(new CompleteSubmissionUploadCommand(intent.SubmissionVersionId, task.Id), CancellationToken.None);
+        await context.SaveChangesAsync();
+        var versions = await new GetSubmissionQueryHandler(context, currentUser, new FakeStorage()).Handle(new GetSubmissionVersionsQuery(submission.Id), CancellationToken.None);
+
+        Assert.Equal(submission.Id, intent.TaskSubmissionId);
+        Assert.Equal(2, intent.VersionNumber);
+        Assert.Equal(SubmissionStatus.SUBMITTED_FOR_REVIEW, submission.Status);
+        Assert.Equal(2, versions.Count);
+        Assert.Contains(versions, version => version.FileName == "Previous.pdf");
+        Assert.Contains(versions, version => version.FileName == "Revised.pdf");
     }
 
     [Fact]
@@ -624,6 +689,11 @@ public sealed class ApplicationWorkflowTests
         var category = new Category { Id = Guid.NewGuid(), Name = $"Category-{Guid.NewGuid():N}" };
         context.Categories.Add(category);
         return category;
+    }
+
+    private static IUploadFilePolicy CreateUploadPolicy()
+    {
+        return new UploadFilePolicy(Options.Create(new UploadFilePolicyOptions()));
     }
 
     private static Student SeedStudent(ApplicationDbContext context)

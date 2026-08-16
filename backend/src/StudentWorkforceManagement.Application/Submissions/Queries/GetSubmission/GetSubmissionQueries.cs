@@ -43,7 +43,18 @@ public sealed class GetSubmissionQueryHandler(IApplicationDbContext dbContext, I
 
         return await dbContext.TaskSubmissions.AsNoTracking()
             .Where(submission => submission.TaskId == request.TaskId)
-            .Select(submission => new SubmissionDto(submission.Id, submission.TaskId, submission.SubmittedById, submission.Status, submission.SubmittedAt, submission.ConcurrencyToken))
+            .Select(submission => new SubmissionDto(
+                submission.Id,
+                submission.TaskId,
+                submission.SubmittedById,
+                submission.Status,
+                submission.SubmittedAt,
+                submission.ConcurrencyToken,
+                submission.Reviews
+                    .Where(review => !review.IsApproved)
+                    .OrderByDescending(review => review.CreatedAt)
+                    .Select(review => review.ReviewerComment)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
     }
 

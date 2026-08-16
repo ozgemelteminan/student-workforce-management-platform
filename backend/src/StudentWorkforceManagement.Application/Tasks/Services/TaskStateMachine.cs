@@ -13,22 +13,24 @@ public sealed class TaskStateMachine : ITaskStateMachine
             throw new InvalidStateTransitionException(currentStatus, targetStatus);
         }
 
-        if (IsStudentWorkflow(targetStatus) && !isAssignedStudent)
-        {
-            throw new ForbiddenException("Only the assigned student may perform this task transition.");
-        }
-
         if (targetStatus is TaskStatus.COMPLETED && isSelfReview)
         {
             throw new ForbiddenException("A user cannot approve their own submitted work.");
         }
 
-        if (targetStatus is TaskStatus.COMPLETED or TaskStatus.IN_PROGRESS && currentStatus is TaskStatus.SUBMITTED_FOR_REVIEW)
+        if ((targetStatus is TaskStatus.COMPLETED or TaskStatus.IN_PROGRESS) && currentStatus is TaskStatus.SUBMITTED_FOR_REVIEW)
         {
             if (!actorRoles.Contains(UserRole.ADMIN) && !actorRoles.Contains(UserRole.REVIEWER))
             {
                 throw new ForbiddenException("Submission review requires ADMIN or REVIEWER authority.");
             }
+
+            return;
+        }
+
+        if (IsStudentWorkflow(targetStatus) && !isAssignedStudent)
+        {
+            throw new ForbiddenException("Only the assigned student may perform this task transition.");
         }
 
         if (targetStatus is TaskStatus.CANCELLED && !actorRoles.Contains(UserRole.ADMIN) && !actorRoles.Contains(UserRole.TASK_MANAGER))

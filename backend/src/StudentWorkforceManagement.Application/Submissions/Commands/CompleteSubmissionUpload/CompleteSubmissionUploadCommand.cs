@@ -142,7 +142,7 @@ public sealed class CompleteSubmissionUploadCommandHandler(IApplicationDbContext
         }
         version.FileStatus = FileStatus.CONFIRMED;
         version.ConfirmedAt = clock.UtcNow;
-        if (version.TaskSubmission is not null && version.TaskSubmission.Status == SubmissionStatus.DRAFT)
+        if (version.TaskSubmission is not null && version.TaskSubmission.Status is SubmissionStatus.DRAFT or SubmissionStatus.REVISION_REQUESTED)
         {
             version.TaskSubmission.Status = SubmissionStatus.SUBMITTED_FOR_REVIEW;
             version.TaskSubmission.SubmittedAt = clock.UtcNow;

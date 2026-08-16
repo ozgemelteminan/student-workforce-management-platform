@@ -178,6 +178,7 @@ export type Submission = {
   status: SubmissionStatus
   submittedAt?: string
   concurrencyToken: string
+  latestReviewerComment?: string
 }
 
 export type SubmissionUploadIntent = {

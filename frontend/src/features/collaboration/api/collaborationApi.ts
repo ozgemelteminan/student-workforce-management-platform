@@ -74,7 +74,7 @@ export function confirmMeeting(id: string, payload: { startAt: string; endAt: st
   return apiRequest<Meeting>(`/meetings/${id}/confirm`, { method: 'POST', body: payload })
 }
 
-export function updateMeetingNotes(id: string, payload: { agenda?: string; notes?: string }) {
+export function updateMeetingNotes(id: string, payload: { title?: string; agenda?: string; notes?: string }) {
   return apiRequest<Meeting>(`/meetings/${id}/notes`, { method: 'PUT', body: payload })
 }
 

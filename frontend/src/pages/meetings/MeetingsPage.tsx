@@ -26,6 +26,7 @@ export function MeetingsPage() {
   const mutations = useCollaborationMutations()
   const [create, setCreate] = useState({ title: '', type: 'IN_PERSON' as MeetingType, responseDeadline: '', participantStudentIds: [] as string[], location: '', agenda: '' })
   const [response, setResponse] = useState({ campusPresence: 'UNSURE' as CampusPresence, startAt: '', endAt: '', note: '' })
+  const [details, setDetails] = useState({ title: '', agenda: '', notes: '' })
   const [actionItem, setActionItem] = useState('')
 
   useEffect(() => {
@@ -36,6 +37,12 @@ export function MeetingsPage() {
     setSelectedId(id)
     navigate(`/meetings/${id}`)
   }
+
+  useEffect(() => {
+    if (selected.data) {
+      setDetails({ title: selected.data.title, agenda: selected.data.agenda ?? '', notes: selected.data.notes ?? '' })
+    }
+  }, [selected.data])
 
   return (
     <div className="space-y-5">
@@ -84,6 +91,14 @@ export function MeetingsPage() {
               {selected.data ? (
                 <div className="space-y-4">
                   <div><div className="flex flex-wrap gap-2"><Badge>{meetingStatusLabels[selected.data.status]}</Badge><Badge variant="info">{meetingTypeLabels[selected.data.type]}</Badge></div><h2 className="mt-2 text-base font-semibold">{selected.data.title}</h2><p className="text-sm text-text-secondary">{selected.data.status === 'CONFIRMED' && selected.data.confirmedStartAt ? `Scheduled ${formatIstanbulDateTime(selected.data.confirmedStartAt)}` : `Respond by ${formatIstanbulDateTime(selected.data.responseDeadline)}`}</p></div>
+                  {staff ? (
+                    <form className="grid gap-2 md:grid-cols-2" onSubmit={(event) => { event.preventDefault(); if (details.title.trim()) void mutations.updateNotes.mutate({ id: selected.data.id, title: details.title.trim(), agenda: details.agenda || undefined, notes: details.notes || undefined }) }}>
+                      <Label title="Title"><Input aria-label="Meeting title" value={details.title} onChange={(event) => setDetails((value) => ({ ...value, title: event.target.value }))} /></Label>
+                      <Label title="Agenda"><Textarea aria-label="Meeting agenda" value={details.agenda} onChange={(event) => setDetails((value) => ({ ...value, agenda: event.target.value }))} /></Label>
+                      <Label title="Notes"><Textarea aria-label="Meeting notes" value={details.notes} onChange={(event) => setDetails((value) => ({ ...value, notes: event.target.value }))} /></Label>
+                      <div className="self-end"><Button type="submit" isLoading={mutations.updateNotes.isPending} disabled={!details.title.trim()}>Save meeting details</Button></div>
+                    </form>
+                  ) : null}
                   <form className="grid gap-2 md:grid-cols-[12rem_1fr_1fr]" onSubmit={(event) => { event.preventDefault(); if (response.startAt && response.endAt) void mutations.respondMeeting.mutate({ id: selected.data.id, campusPresence: response.campusPresence, availableRangesJson: JSON.stringify([{ startAt: toApiInstant(response.startAt), endAt: toApiInstant(response.endAt) }]), note: response.note || undefined }) }}>
                     <Select value={response.campusPresence} onValueChange={(campusPresence) => setResponse((value) => ({ ...value, campusPresence: campusPresence as CampusPresence }))}><SelectTrigger aria-label="Campus presence"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ON_CAMPUS">{campusPresenceLabels.ON_CAMPUS}</SelectItem><SelectItem value="OFF_CAMPUS">{campusPresenceLabels.OFF_CAMPUS}</SelectItem><SelectItem value="UNSURE">{campusPresenceLabels.UNSURE}</SelectItem></SelectContent></Select>
                     <Input aria-label="Available from" type="datetime-local" value={response.startAt} onChange={(event) => setResponse((value) => ({ ...value, startAt: event.target.value }))} />

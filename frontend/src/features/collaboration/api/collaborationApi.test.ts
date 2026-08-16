@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '../../../lib/api'
-import { confirmMeeting, createMeeting, createUnavailability, getCurrentTimesheet, getMeeting, getMeetingSlots, getMeetings, getTimesheets, respondToMeeting, reviewTimesheet, submitTimesheet, upsertTimesheetEntry } from './collaborationApi'
+import { confirmMeeting, createMeeting, createUnavailability, getCurrentTimesheet, getMeeting, getMeetingSlots, getMeetings, getTimesheets, respondToMeeting, reviewTimesheet, submitTimesheet, updateMeetingNotes, upsertTimesheetEntry } from './collaborationApi'
 
 vi.mock('../../../lib/api', () => ({
   apiRequest: vi.fn(),
@@ -38,6 +38,7 @@ describe('collaboration API client', () => {
     await respondToMeeting('meeting-1', { campusPresence: 'ON_CAMPUS', availableRangesJson: '[]' })
     await getMeetingSlots('meeting-1')
     await confirmMeeting('meeting-1', { startAt: '2026-08-11T10:00:00Z', endAt: '2026-08-11T11:00:00Z' })
+    await updateMeetingNotes('meeting-1', { title: 'Planning', agenda: 'Review capacity', notes: 'Bring schedule updates.' })
 
     expect(mockedApiRequest).toHaveBeenNthCalledWith(1, '/unavailability', { method: 'POST', body: { startAt: '2026-08-10T09:00:00Z', endAt: '2026-08-10T12:00:00Z', category: 'Exam' } })
     expect(mockedApiRequest).toHaveBeenNthCalledWith(2, '/meetings?page=1&pageSize=10&status=AVAILABILITY_REQUESTED', { signal: undefined })
@@ -46,5 +47,6 @@ describe('collaboration API client', () => {
     expect(mockedApiRequest).toHaveBeenNthCalledWith(5, '/meetings/meeting-1/response', { method: 'POST', body: { campusPresence: 'ON_CAMPUS', availableRangesJson: '[]' } })
     expect(mockedApiRequest).toHaveBeenNthCalledWith(6, '/meetings/meeting-1/slot-recommendations', { signal: undefined })
     expect(mockedApiRequest).toHaveBeenNthCalledWith(7, '/meetings/meeting-1/confirm', { method: 'POST', body: { startAt: '2026-08-11T10:00:00Z', endAt: '2026-08-11T11:00:00Z' } })
+    expect(mockedApiRequest).toHaveBeenNthCalledWith(8, '/meetings/meeting-1/notes', { method: 'PUT', body: { title: 'Planning', agenda: 'Review capacity', notes: 'Bring schedule updates.' } })
   })
 })

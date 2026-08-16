@@ -813,6 +813,26 @@ public sealed class ApplicationWorkflowTests
         Assert.Equal("Bring intake list", Assert.Single(detail.ActionItems).Title);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task Staff_can_update_meeting_title_without_changing_meeting_workflow()
+    {
+        await using var context = CreateContext();
+        var attendee = SeedStudent(context);
+        await context.SaveChangesAsync();
+        var staff = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.TASK_MANAGER);
+        var commandHandler = CreateCollaborationCommandHandler(context, staff);
+        var meeting = await commandHandler.Handle(new CreateMeetingCommand("Meetign", MeetingType.IN_PERSON, DateTimeOffset.UtcNow.AddDays(1), new[] { attendee.Id }, "Campus", "Draft agenda"), CancellationToken.None);
+
+        var updated = await commandHandler.Handle(new UpdateMeetingNotesCommand(meeting.Id, "Meeting", "Final agenda", "Bring updates."), CancellationToken.None);
+        var detail = await new CollaborationQueryHandler(context, staff, new FakeClock()).Handle(new GetMeetingQuery(meeting.Id), CancellationToken.None);
+
+        Assert.Equal("Meeting", updated.Title);
+        Assert.Equal("Meeting", detail.Title);
+        Assert.Equal(MeetingStatus.AVAILABILITY_REQUESTED, detail.Status);
+        Assert.Equal("Final agenda", detail.Agenda);
+        Assert.Equal("Bring updates.", detail.Notes);
+    }
+
     private static ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -606,7 +606,7 @@ public static class V1Endpoints
         meetings.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmMeetingRequest request, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new ConfirmMeetingCommand(id, request.StartAt, request.EndAt, request.Location), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         meetings.MapPut("/{id:guid}/notes", async (Guid id, MeetingNotesRequest request, ISender sender, CancellationToken cancellationToken) =>
-            Results.Ok(await sender.Send(new UpdateMeetingNotesCommand(id, request.Agenda, request.Notes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
+            Results.Ok(await sender.Send(new UpdateMeetingNotesCommand(id, request.Title, request.Agenda, request.Notes), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         meetings.MapPost("/{id:guid}/cancel", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
             Results.Ok(await sender.Send(new CancelMeetingCommand(id), cancellationToken))).RequireAuthorization("STAFF_TASK_MANAGEMENT");
         meetings.MapPost("/{id:guid}/action-items", async (Guid id, MeetingActionItemRequest request, ISender sender, CancellationToken cancellationToken) =>
@@ -686,7 +686,7 @@ public static class V1Endpoints
     public sealed record CreateMeetingRequest(string Title, MeetingType Type, DateTimeOffset ResponseDeadline, IReadOnlyCollection<Guid> ParticipantStudentIds, string? Location, string? Agenda);
     public sealed record MeetingResponseRequest(CampusPresence CampusPresence, string AvailableRangesJson, string? Note);
     public sealed record ConfirmMeetingRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, string? Location);
-    public sealed record MeetingNotesRequest(string? Agenda, string? Notes);
+    public sealed record MeetingNotesRequest(string? Title, string? Agenda, string? Notes);
     public sealed record MeetingActionItemRequest(string Title, Guid? AssignedStudentId);
     public sealed record ActionItemTaskRequest(Guid CategoryId, Guid? SemesterId, TaskPriority Priority, TaskDifficulty Difficulty, DateTimeOffset Deadline, int EstimatedDurationMinutes);
 }

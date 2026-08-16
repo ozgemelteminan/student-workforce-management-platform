@@ -5,6 +5,13 @@ import type { Student, StudentFilters } from '../../features/students/types'
 import { useStudents } from '../../features/students/useStudentQueries'
 import { formatIstanbulDate } from '../../lib/date-time'
 
+const studentSortLabels: Record<NonNullable<StudentFilters['sortBy']>, string> = {
+  name: 'Name',
+  email: 'Email',
+  department: 'Department',
+  created: 'Created date',
+}
+
 export function StudentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -41,7 +48,7 @@ export function StudentsPage() {
             <div className="grid grid-cols-2 gap-3">
               <Select value={filters.sortBy ?? 'name'} onValueChange={(value) => updateFilters({ sortBy: value as StudentFilters['sortBy'], page: 1 })}>
                 <SelectTrigger aria-label="Sort students"><SelectValue /></SelectTrigger>
-                <SelectContent>{['name', 'email', 'department', 'created'].map((sort) => <SelectItem key={sort} value={sort}>{sort}</SelectItem>)}</SelectContent>
+                <SelectContent>{['name', 'email', 'department', 'created'].map((sort) => <SelectItem key={sort} value={sort}>{studentSortLabels[sort as NonNullable<StudentFilters['sortBy']>]}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={filters.sortDirection ?? 'asc'} onValueChange={(value) => updateFilters({ sortDirection: value as 'asc' | 'desc', page: 1 })}>
                 <SelectTrigger aria-label="Sort direction"><SelectValue /></SelectTrigger>

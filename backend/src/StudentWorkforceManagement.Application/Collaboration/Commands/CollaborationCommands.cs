@@ -64,7 +64,7 @@ public sealed record ConfirmMeetingCommand(Guid MeetingId, DateTimeOffset StartA
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
 }
 
-public sealed record UpdateMeetingNotesCommand(Guid MeetingId, string? Agenda, string? Notes) : IRequest<MeetingDto>, IAuthorizableRequest
+public sealed record UpdateMeetingNotesCommand(Guid MeetingId, string? Title, string? Agenda, string? Notes) : IRequest<MeetingDto>, IAuthorizableRequest
 {
     public IReadOnlyCollection<UserRole> RequiredRoles => Authorize.StaffTaskManagement;
 }
@@ -318,6 +318,10 @@ public sealed class CollaborationCommandHandler(
     {
         var meeting = await dbContext.Meetings.SingleOrDefaultAsync(entity => entity.Id == request.MeetingId, cancellationToken)
             ?? throw new NotFoundException("Meeting", request.MeetingId);
+        if (!string.IsNullOrWhiteSpace(request.Title))
+        {
+            meeting.Title = request.Title.Trim();
+        }
         meeting.Agenda = request.Agenda;
         meeting.Notes = request.Notes;
         await dbContext.SaveChangesAsync(cancellationToken);

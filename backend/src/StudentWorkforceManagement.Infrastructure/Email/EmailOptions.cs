@@ -26,6 +26,8 @@ public sealed class EmailOptions
 
     public string FromName { get; init; } = "Student Workforce Management";
 
+    public string FrontendBaseUrl { get; init; } = "http://localhost:5173";
+
     public string DevelopmentSinkPath { get; init; } = "storage/dev-emails";
 
     public string DevelopmentFrontendBaseUrl { get; init; } = "http://localhost:5173";

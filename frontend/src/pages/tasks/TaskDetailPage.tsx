@@ -25,7 +25,7 @@ export function TaskDetailPage() {
   const task = useTask(taskId)
   const currentStudent = useCurrentStudent(student)
   const collections = useTaskCollections(taskId, staff)
-  const lookups = useTaskLookups()
+  const lookups = useTaskLookups({ studentsEnabled: staff })
   const mutations = useTaskMutations(taskId)
   const [comment, setComment] = useState('')
   const [commentVisibility, setCommentVisibility] = useState<TaskCommentVisibility>('STUDENT_VISIBLE')

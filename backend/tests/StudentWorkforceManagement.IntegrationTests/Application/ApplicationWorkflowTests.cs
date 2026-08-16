@@ -15,6 +15,7 @@ using StudentWorkforceManagement.Application.Marketplace.Queries.GetMarketplaceL
 using StudentWorkforceManagement.Application.Requests.Commands.CreateTaskRequest;
 using StudentWorkforceManagement.Application.Requests.Queries.GetTaskRequests;
 using StudentWorkforceManagement.Application.Notifications.Queries.GetNotificationPreferences;
+using StudentWorkforceManagement.Application.Availability.Commands.CreateAvailability;
 using StudentWorkforceManagement.Application.Skills.Commands;
 using StudentWorkforceManagement.Application.Skills.Queries.GetStudentSkills;
 using StudentWorkforceManagement.Application.Students.Commands;
@@ -202,6 +203,47 @@ public sealed class ApplicationWorkflowTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Availability_accepts_preferred_status_for_valid_time_range()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var semester = SeedSemester(context);
+        await context.SaveChangesAsync();
+        var handler = new CreateAvailabilityCommandHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT));
+
+        var created = await handler.Handle(new CreateAvailabilityCommand(student.Id, semester.Id, DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(12, 0), AvailabilityStatus.PREFERRED, "Best focus window"), CancellationToken.None);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(AvailabilityStatus.PREFERRED, created.Status);
+        Assert.Equal("Best focus window", created.Reason);
+        Assert.Contains(context.Availability, item => item.Id == created.Id && item.Status == AvailabilityStatus.PREFERRED);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Availability_rejects_real_overlap_with_conflict()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var semester = SeedSemester(context);
+        context.Availability.Add(new Availability
+        {
+            Id = Guid.NewGuid(),
+            StudentId = student.Id,
+            SemesterId = semester.Id,
+            DayOfWeek = DayOfWeek.Monday,
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(11, 0),
+            Status = AvailabilityStatus.AVAILABLE
+        });
+        await context.SaveChangesAsync();
+        var handler = new CreateAvailabilityCommandHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT));
+
+        var exception = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new CreateAvailabilityCommand(student.Id, semester.Id, DayOfWeek.Monday, new TimeOnly(10, 0), new TimeOnly(12, 0), AvailabilityStatus.PREFERRED, null), CancellationToken.None));
+
+        Assert.Equal("Availability overlaps an existing availability record.", exception.Message);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Submission_file_access_allows_confirmed_own_file_and_rejects_pending_or_other_student()
     {
         await using var context = CreateContext();
@@ -284,6 +326,28 @@ public sealed class ApplicationWorkflowTests
         Assert.Equal(TaskStatus.IN_PROGRESS, task.Status);
         Assert.Equal(SubmissionStatus.REVISION_REQUESTED, submission.Status);
         Assert.Equal("Please add the missing appendix.", Assert.Single(visibleSubmissions).LatestReviewerComment);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Submission_review_rejects_stale_non_submitted_submission()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var task = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.SUBMITTED_FOR_REVIEW);
+        var staleSubmission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = student.Id, Status = SubmissionStatus.REVISION_REQUESTED, SubmittedAt = DateTimeOffset.UtcNow.AddDays(-1) };
+        var activeSubmission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = task.Id, SubmittedById = student.Id, Status = SubmissionStatus.SUBMITTED_FOR_REVIEW, SubmittedAt = DateTimeOffset.UtcNow };
+        context.TaskSubmissions.AddRange(staleSubmission, activeSubmission);
+        await context.SaveChangesAsync();
+        var reviewer = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.REVIEWER);
+        var handler = new ReviewSubmissionCommandHandler(context, reviewer, new TaskStateMachine(), new AuditService(context, reviewer), new NoOpEventQueue(), new FakeClock());
+
+        var exception = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(new RequestSubmissionRevisionCommand(staleSubmission.Id, "Please revise the current file."), CancellationToken.None));
+        var review = await handler.Handle(new ApproveSubmissionCommand(activeSubmission.Id, "Looks good."), CancellationToken.None);
+
+        Assert.Equal("Only submitted submissions can be reviewed.", exception.Message);
+        Assert.True(review.IsApproved);
+        Assert.Equal(TaskStatus.COMPLETED, task.Status);
+        Assert.Equal(SubmissionStatus.APPROVED, activeSubmission.Status);
     }
 
     [Fact]
@@ -701,6 +765,21 @@ public sealed class ApplicationWorkflowTests
         var student = new Student { Id = Guid.NewGuid(), UserId = Guid.NewGuid(), FirstName = "Ada", LastName = "Lovelace", Email = $"ada-{Guid.NewGuid():N}@example.com", Department = "Operations", IsActive = true };
         context.Students.Add(student);
         return student;
+    }
+
+    private static Semester SeedSemester(ApplicationDbContext context)
+    {
+        var semester = new Semester
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Semester-{Guid.NewGuid():N}",
+            StartDate = new DateOnly(2026, 9, 1),
+            EndDate = new DateOnly(2027, 1, 15),
+            Status = SemesterStatus.ACTIVE,
+            IsActive = true
+        };
+        context.Semesters.Add(semester);
+        return semester;
     }
 
     private static DomainTask SeedTask(ApplicationDbContext context, string title = "Task", Guid? categoryId = null, Guid? assignedStudentId = null, TaskStatus status = TaskStatus.ASSIGNED, int minutes = 60)

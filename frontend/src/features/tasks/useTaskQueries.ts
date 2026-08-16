@@ -93,12 +93,13 @@ export function useRequiredSkills(taskId: string | undefined) {
   return useQuery({ queryKey: queryKeys.tasks.skills(taskId ?? 'missing'), queryFn: ({ signal }) => getRequiredSkills(taskId ?? '', signal), enabled: Boolean(taskId) })
 }
 
-export function useTaskLookups() {
+export function useTaskLookups(options: { studentsEnabled?: boolean } = {}) {
+  const studentsEnabled = options.studentsEnabled ?? true
   return {
     categories: useQuery({ queryKey: queryKeys.categories.list({ includeInactive: false }), queryFn: ({ signal }) => getCategories(false, signal) }),
     semesters: useQuery({ queryKey: queryKeys.semesters.list({ includeInactive: false }), queryFn: ({ signal }) => getSemesters(false, signal) }),
     skills: useQuery({ queryKey: queryKeys.skills.list({ includeInactive: false }), queryFn: ({ signal }) => getSkills(false, signal) }),
-    students: useQuery({ queryKey: queryKeys.students.list({ page: 1, pageSize: 50 }), queryFn: ({ signal }) => getStudents(undefined, signal) }),
+    students: useQuery({ queryKey: queryKeys.students.list({ page: 1, pageSize: 50 }), queryFn: ({ signal }) => getStudents(undefined, signal), enabled: studentsEnabled }),
   }
 }
 

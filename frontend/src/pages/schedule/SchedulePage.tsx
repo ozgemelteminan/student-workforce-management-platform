@@ -6,6 +6,7 @@ import { availabilityStatuses, dayOfWeekValues, formatTimeRange, isValidTimeRang
 import type { Availability, AvailabilityStatus, CourseSchedule, DayOfWeek } from '../../features/schedules/types'
 import { useActiveSemester, useScheduleCollections, useScheduleMutations, useSemesters } from '../../features/schedules/useScheduleQueries'
 import { CourseWeeklyTimetable } from '../../features/schedules/components/CourseWeeklyTimetable'
+import { ApiError } from '../../lib/api'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatDateOnly } from '../../lib/date-time'
 
@@ -13,7 +14,7 @@ export function SchedulePage() {
   const { user } = useAuth()
   const roles = user?.roles ?? []
   const isStudent = roles.includes('STUDENT') && !roles.some((role) => role === 'ADMIN' || role === 'TASK_MANAGER')
-  const students = useStudents({ page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' })
+  const students = useStudents({ page: 1, pageSize: 100, sortBy: 'name', sortDirection: 'asc' }, !isStudent)
   const me = useCurrentStudent(isStudent)
   const semesters = useSemesters()
   const activeSemester = useActiveSemester()
@@ -68,10 +69,11 @@ export function SchedulePage() {
       {studentId ? (
         <CourseWeeklyTimetable
           schedule={collections.schedule.data ?? []}
+          availability={collections.availability.data ?? []}
           isLoading={collections.schedule.isLoading}
-          isError={collections.schedule.isError}
+          isError={collections.schedule.isError || collections.availability.isError}
           emptyAudience={isStudent ? 'student' : 'staff'}
-          onRetry={() => void collections.schedule.refetch()}
+          onRetry={() => { void collections.schedule.refetch(); void collections.availability.refetch() }}
         />
       ) : null}
       <div className="grid gap-4 xl:grid-cols-2">
@@ -150,33 +152,59 @@ function ScheduleForm({ studentId, semesterId, editing, onDone }: { studentId: s
 function AvailabilityForm({ studentId, semesterId, editing, onDone }: { studentId: string; semesterId: string; editing: Availability | null; onDone: () => void }) {
   const mutations = useScheduleMutations(studentId)
   const [form, setForm] = useState({ dayOfWeek: 'Monday' as DayOfWeek, startTime: '09:00', endTime: '12:00', status: 'AVAILABLE' as AvailabilityStatus, reason: '' })
+  const [formError, setFormError] = useState<string | null>(null)
   useEffect(() => {
     if (editing) {
       setForm({ dayOfWeek: editing.dayOfWeek, startTime: editing.startTime.slice(0, 5), endTime: editing.endTime.slice(0, 5), status: editing.status, reason: editing.reason ?? '' })
+      setFormError(null)
     }
   }, [editing])
   const valid = isValidTimeRange(form.startTime, form.endTime)
-  const submit = (event: FormEvent) => {
+  const timeError = valid ? undefined : 'End time must be after start time.'
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!valid) return
+    setFormError(null)
+    if (!valid) {
+      setFormError('Availability end time must be after start time.')
+      return
+    }
     const payload = { ...form, reason: form.reason || undefined }
-    if (editing) {
-      mutations.updateAvailability.mutate({ id: editing.id, payload }, { onSuccess: onDone })
-    } else {
-      mutations.createAvailability.mutate({ studentId, semesterId, ...payload }, { onSuccess: () => setForm({ ...form, reason: '' }) })
+    try {
+      if (editing) {
+        await mutations.updateAvailability.mutateAsync({ id: editing.id, payload })
+        onDone()
+      } else {
+        await mutations.createAvailability.mutateAsync({ studentId, semesterId, ...payload })
+        setForm({ ...form, reason: '' })
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setFormError(error.problem.detail ?? error.problem.title ?? 'Availability overlaps an existing availability record.')
+        return
+      }
+      if (error instanceof ApiError && (error.status === 400 || error.status === 422)) {
+        setFormError(firstValidationMessage(error) ?? error.problem.detail ?? error.problem.title)
+        return
+      }
+      throw error
     }
   }
   return (
     <form className="grid gap-3 md:grid-cols-3" onSubmit={submit}>
       <FormField label="Day">{({ id }) => <Select value={form.dayOfWeek} onValueChange={(value) => setForm({ ...form, dayOfWeek: value as DayOfWeek })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{dayOfWeekValues.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select>}</FormField>
-      <FormField label="Start">{({ id }) => <Input id={id} type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} />}</FormField>
-      <FormField label="End">{({ id }) => <Input id={id} type="time" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} />}</FormField>
+      <FormField label="Start" error={timeError}>{({ id, describedBy, invalid }) => <Input id={id} type="time" value={form.startTime} invalid={invalid} aria-describedby={describedBy} onChange={(event) => setForm({ ...form, startTime: event.target.value })} />}</FormField>
+      <FormField label="End" error={timeError}>{({ id, describedBy, invalid }) => <Input id={id} type="time" value={form.endTime} invalid={invalid} aria-describedby={describedBy} onChange={(event) => setForm({ ...form, endTime: event.target.value })} />}</FormField>
       <FormField label="Status">{({ id }) => <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value as AvailabilityStatus })}><SelectTrigger id={id}><SelectValue /></SelectTrigger><SelectContent>{availabilityStatuses.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent></Select>}</FormField>
       <FormField label="Reason" className="md:col-span-2">{({ id }) => <Textarea id={id} value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />}</FormField>
+      {formError ? <p className="text-sm text-destructive md:col-span-3" role="alert">{formError}</p> : null}
       <div className="flex gap-2">
         <Button type="submit" iconBefore={<Plus aria-hidden="true" className="h-4 w-4" />} isLoading={mutations.createAvailability.isPending || mutations.updateAvailability.isPending} disabled={!valid}>{editing ? 'Update availability' : 'Add availability'}</Button>
         {editing ? <Button variant="ghost" onClick={onDone}>Cancel edit</Button> : null}
       </div>
     </form>
   )
+}
+
+function firstValidationMessage(error: ApiError) {
+  return Object.values(error.problem.validationErrors).flat()[0]
 }

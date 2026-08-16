@@ -19,19 +19,21 @@ export const SelectTrigger = forwardRef<ElementRef<typeof SelectPrimitive.Trigge
 )
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
-export const SelectContent = forwardRef<ElementRef<typeof SelectPrimitive.Content>, ComponentPropsWithoutRef<typeof SelectPrimitive.Content>>(
-  ({ className, position = 'popper', ...props }, ref) => (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Content ref={ref} position={position} className={cn('z-popover max-h-72 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface text-sm text-text-primary shadow-elevated', className)} {...props} />
-    </SelectPrimitive.Portal>
-  ),
-)
-SelectContent.displayName = SelectPrimitive.Content.displayName
-
 export const SelectViewport = forwardRef<ElementRef<typeof SelectPrimitive.Viewport>, ComponentPropsWithoutRef<typeof SelectPrimitive.Viewport>>(
   ({ className, ...props }, ref) => <SelectPrimitive.Viewport ref={ref} className={cn('p-1', className)} {...props} />,
 )
 SelectViewport.displayName = SelectPrimitive.Viewport.displayName
+
+export const SelectContent = forwardRef<ElementRef<typeof SelectPrimitive.Content>, ComponentPropsWithoutRef<typeof SelectPrimitive.Content>>(
+  ({ className, position = 'popper', children, ...props }, ref) => (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content ref={ref} position={position} className={cn('z-popover max-h-72 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface text-sm text-text-primary shadow-elevated', className)} {...props}>
+        <SelectViewport>{children}</SelectViewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  ),
+)
+SelectContent.displayName = SelectPrimitive.Content.displayName
 
 export const SelectItem = forwardRef<ElementRef<typeof SelectPrimitive.Item>, ComponentPropsWithoutRef<typeof SelectPrimitive.Item>>(
   ({ className, children, ...props }, ref) => (

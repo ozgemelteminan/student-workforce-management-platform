@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../../lib/api'
 import { queryKeys } from '../../lib/query'
 import { appToast } from '../../lib/toast'
 import { approveSubmission, getReviewQueue, getVersions, openSubmissionVersionDownload, openSubmissionVersionView, requestSubmissionRevision } from './api/reviewsApi'
@@ -27,9 +28,16 @@ export function useReviewMutations() {
   }
 
   return {
-    approve: useMutation({ mutationFn: ({ submissionId, reviewerComment }: { submissionId: string; reviewerComment?: string; taskId?: string }) => approveSubmission(submissionId, reviewerComment), onSuccess: async (_, variables) => { appToast.success('Submission approved.'); await invalidate(variables.taskId, variables.submissionId) } }),
-    requestRevision: useMutation({ mutationFn: ({ submissionId, reviewerComment }: { submissionId: string; reviewerComment: string; taskId?: string }) => requestSubmissionRevision(submissionId, reviewerComment), onSuccess: async (_, variables) => { appToast.success('Revision requested.'); await invalidate(variables.taskId, variables.submissionId) } }),
+    approve: useMutation({ mutationFn: ({ submissionId, reviewerComment }: { submissionId: string; reviewerComment?: string; taskId?: string }) => approveSubmission(submissionId, reviewerComment), onSuccess: async (_, variables) => { appToast.success('Submission approved.'); await invalidate(variables.taskId, variables.submissionId) }, onError: (error) => appToast.error(reviewErrorMessage(error)) }),
+    requestRevision: useMutation({ mutationFn: ({ submissionId, reviewerComment }: { submissionId: string; reviewerComment: string; taskId?: string }) => requestSubmissionRevision(submissionId, reviewerComment), onSuccess: async (_, variables) => { appToast.success('Revision requested.'); await invalidate(variables.taskId, variables.submissionId) }, onError: (error) => appToast.error(reviewErrorMessage(error)) }),
     viewVersion: useMutation({ mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => openSubmissionVersionView(submissionId, versionId) }),
     downloadVersion: useMutation({ mutationFn: ({ submissionId, versionId }: { submissionId: string; versionId: string }) => openSubmissionVersionDownload(submissionId, versionId) }),
   }
+}
+
+function reviewErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    return error.problem.detail ?? error.problem.title
+  }
+  return 'Review action failed.'
 }

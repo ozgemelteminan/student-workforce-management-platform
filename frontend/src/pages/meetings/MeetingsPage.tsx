@@ -21,7 +21,7 @@ export function MeetingsPage() {
   const meetings = useMeetings({ page: 1, pageSize: 30, status: status === 'ALL' ? undefined : status })
   const selected = useMeeting(selectedId)
   const slots = useMeetingSlots(selectedId, Boolean(selectedId && staff))
-  const lookups = useTaskLookups()
+  const lookups = useTaskLookups({ studentsEnabled: staff })
   const mutations = useCollaborationMutations()
   const [create, setCreate] = useState({ title: '', type: 'IN_PERSON' as MeetingType, responseDeadline: '', participantStudentIds: [] as string[], location: '', agenda: '' })
   const [response, setResponse] = useState({ campusPresence: 'UNSURE' as CampusPresence, startAt: '', endAt: '', note: '' })

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { CourseWeeklyTimetable } from './CourseWeeklyTimetable'
-import type { CourseSchedule } from '../types'
+import type { Availability, CourseSchedule } from '../types'
 
 const baseCourse: CourseSchedule = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -13,6 +13,18 @@ const baseCourse: CourseSchedule = {
   startTime: '09:00',
   endTime: '10:00',
   location: 'CSM 303',
+}
+
+const baseAvailability: Availability = {
+  id: '44444444-4444-4444-8444-444444444444',
+  studentId: baseCourse.studentId,
+  semesterId: baseCourse.semesterId,
+  dayOfWeek: 'Tuesday',
+  startTime: '09:30',
+  endTime: '11:00',
+  status: 'PREFERRED',
+  reason: 'Project work',
+  concurrencyToken: '55555555-5555-4555-8555-555555555555',
 }
 
 describe('CourseWeeklyTimetable', () => {
@@ -51,6 +63,19 @@ describe('CourseWeeklyTimetable', () => {
     expect(within(tuesday).getByText('MATH 101')).toBeInTheDocument()
     expect(within(tuesday).getByText('HIST 210')).toBeInTheDocument()
     expect(within(sunday).getByText('PHYS 104')).toBeInTheDocument()
+  })
+
+  it('renders availability blocks on the correct day with human status, reason, and overlap-safe course content', () => {
+    render(<CourseWeeklyTimetable schedule={[baseCourse]} availability={[baseAvailability, { ...baseAvailability, id: 'availability-2', dayOfWeek: 'Saturday', status: 'UNAVAILABLE', reason: 'Family commitment', startTime: '14:00', endTime: '16:00' }]} isLoading={false} />)
+
+    const tuesday = screen.getByTestId('timetable-day-Tuesday')
+    const saturday = screen.getByTestId('timetable-day-Saturday')
+    expect(within(tuesday).getByText('CMPE 222')).toBeInTheDocument()
+    expect(within(tuesday).getByText('Preferred')).toBeInTheDocument()
+    expect(within(tuesday).getByText('Project work')).toBeInTheDocument()
+    expect(within(tuesday).getByText('09:30-11:00')).toBeInTheDocument()
+    expect(within(saturday).getByText('Unavailable')).toBeInTheDocument()
+    expect(within(saturday).getByText('Family commitment')).toBeInTheDocument()
   })
 
   it('uses student and staff empty-state copy distinctly', () => {

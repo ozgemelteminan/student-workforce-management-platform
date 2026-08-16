@@ -4,4 +4,5 @@ public enum AvailabilityStatus
 {
     AVAILABLE,
     UNAVAILABLE,
+    PREFERRED,
 }

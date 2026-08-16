@@ -4,7 +4,10 @@ import type { ReviewQueueItem, TaskReview } from '../types'
 
 export async function getReviewQueue(signal?: AbortSignal): Promise<ReviewQueueItem[]> {
   const tasks = await getTasks({ page: 1, pageSize: 50, status: 'SUBMITTED_FOR_REVIEW', sortBy: 'deadline', sortDirection: 'asc' }, signal)
-  const withSubmissions = await Promise.all(tasks.items.map(async (task) => ({ task, submissions: await getSubmissions(task.id, signal) })))
+  const withSubmissions = await Promise.all(tasks.items.map(async (task) => ({
+    task,
+    submissions: (await getSubmissions(task.id, signal)).filter((submission) => submission.status === 'SUBMITTED_FOR_REVIEW'),
+  })))
   return withSubmissions.filter((item) => item.submissions.length > 0)
 }
 

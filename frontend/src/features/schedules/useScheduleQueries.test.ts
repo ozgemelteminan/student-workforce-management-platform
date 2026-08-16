@@ -34,14 +34,17 @@ describe('useScheduleMutations', () => {
   it('refreshes timetable data after add and remove schedule mutations', async () => {
     const mutations = useScheduleMutations('student-1') as unknown as {
       createSchedule: { onSuccess: () => Promise<void> }
+      createAvailability: { onSuccess: () => Promise<void> }
       deleteSchedule: { onSuccess: () => Promise<void> }
     }
 
     await mutations.createSchedule.onSuccess()
+    await mutations.createAvailability.onSuccess()
     await mutations.deleteSchedule.onSuccess()
 
     expect(useMutation).toHaveBeenCalled()
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.schedules.all })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.availability.all })
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.students.detail('student-1') })
   })
 })

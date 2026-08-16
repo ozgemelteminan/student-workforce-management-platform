@@ -88,6 +88,10 @@ public sealed class ReviewSubmissionCommandHandler(IApplicationDbContext dbConte
         {
             throw new ConflictException("Only submitted tasks can be reviewed.");
         }
+        if (submission.Status != SubmissionStatus.SUBMITTED_FOR_REVIEW)
+        {
+            throw new ConflictException("Only submitted submissions can be reviewed.");
+        }
 
         var targetStatus = approved ? TaskStatus.COMPLETED : TaskStatus.IN_PROGRESS;
         stateMachine.ValidateTransition(task.Status, targetStatus, currentUser.Roles, isAssignedStudent: false, isSelfReview: false);

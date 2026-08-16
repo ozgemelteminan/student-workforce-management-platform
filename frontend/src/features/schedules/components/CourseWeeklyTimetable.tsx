@@ -205,8 +205,8 @@ function formatAvailabilityStatus(status: AvailabilityStatus) {
 function availabilityBlockClass(status: AvailabilityStatus) {
   const classes: Record<AvailabilityStatus, string> = {
     AVAILABLE: 'border-success/30 bg-success/10',
-    PREFERRED: 'border-brand/30 bg-surface-secondary',
-    UNAVAILABLE: 'border-warning/30 bg-warning/10',
+    PREFERRED: 'border-info/30 bg-info/10',
+    UNAVAILABLE: 'border-destructive/30 bg-destructive/10',
   }
   return classes[status]
 }

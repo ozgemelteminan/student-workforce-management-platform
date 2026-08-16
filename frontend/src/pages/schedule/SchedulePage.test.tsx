@@ -32,6 +32,7 @@ const createAvailability = vi.fn()
 describe('SchedulePage availability workflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    createAvailability.mockResolvedValue({})
     authState.roles = ['STUDENT']
     useStudents.mockReturnValue({ data: { items: [] } })
     useCurrentStudent.mockReturnValue({ data: { student: { id: 'student-1', firstName: 'Test', lastName: 'Student' } } })
@@ -80,6 +81,20 @@ describe('SchedulePage availability workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add availability/i }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Availability overlaps an existing availability record.'))
+    expect(createAvailability).toHaveBeenCalledTimes(1)
+  })
+
+  it('displays validation messages returned by availability create', async () => {
+    createAvailability.mockRejectedValue(new ApiError({
+      status: 400,
+      title: 'Validation failed',
+      validationErrors: { EndTime: ['Availability end time must be after start time.'] },
+    }))
+    render(<SchedulePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add availability/i }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Availability end time must be after start time.'))
     expect(createAvailability).toHaveBeenCalledTimes(1)
   })
 })

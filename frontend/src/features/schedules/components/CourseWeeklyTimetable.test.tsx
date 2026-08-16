@@ -66,16 +66,25 @@ describe('CourseWeeklyTimetable', () => {
   })
 
   it('renders availability blocks on the correct day with human status, reason, and overlap-safe course content', () => {
-    render(<CourseWeeklyTimetable schedule={[baseCourse]} availability={[baseAvailability, { ...baseAvailability, id: 'availability-2', dayOfWeek: 'Saturday', status: 'UNAVAILABLE', reason: 'Family commitment', startTime: '14:00', endTime: '16:00' }]} isLoading={false} />)
+    render(<CourseWeeklyTimetable schedule={[baseCourse]} availability={[
+      { ...baseAvailability, id: 'availability-1', status: 'AVAILABLE', reason: 'Open office hours', startTime: '08:00', endTime: '09:00' },
+      baseAvailability,
+      { ...baseAvailability, id: 'availability-2', dayOfWeek: 'Saturday', status: 'UNAVAILABLE', reason: 'Family commitment', startTime: '14:00', endTime: '16:00' },
+    ]} isLoading={false} />)
 
     const tuesday = screen.getByTestId('timetable-day-Tuesday')
     const saturday = screen.getByTestId('timetable-day-Saturday')
     expect(within(tuesday).getByText('CMPE 222')).toBeInTheDocument()
+    expect(within(tuesday).getByText('Available')).toBeInTheDocument()
     expect(within(tuesday).getByText('Preferred')).toBeInTheDocument()
     expect(within(tuesday).getByText('Project work')).toBeInTheDocument()
     expect(within(tuesday).getByText('09:30-11:00')).toBeInTheDocument()
     expect(within(saturday).getByText('Unavailable')).toBeInTheDocument()
     expect(within(saturday).getByText('Family commitment')).toBeInTheDocument()
+    expect(within(tuesday).getByText('Available').closest('article')).toHaveClass('border-success/30', 'bg-success/10')
+    expect(within(tuesday).getByText('Preferred').closest('article')).toHaveClass('border-info/30', 'bg-info/10')
+    expect(within(saturday).getByText('Unavailable').closest('article')).toHaveClass('border-destructive/30', 'bg-destructive/10')
+    expect(within(tuesday).getByText('CMPE 222').closest('article')).toHaveClass('border-brand/30', 'bg-brand-subtle')
   })
 
   it('uses student and staff empty-state copy distinctly', () => {

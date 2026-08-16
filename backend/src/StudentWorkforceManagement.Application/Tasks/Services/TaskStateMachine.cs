@@ -18,7 +18,7 @@ public sealed class TaskStateMachine : ITaskStateMachine
             throw new ForbiddenException("A user cannot approve their own submitted work.");
         }
 
-        if ((targetStatus is TaskStatus.COMPLETED or TaskStatus.IN_PROGRESS) && currentStatus is TaskStatus.SUBMITTED_FOR_REVIEW)
+        if (IsReviewWorkflow(currentStatus, targetStatus))
         {
             if (!actorRoles.Contains(UserRole.ADMIN) && !actorRoles.Contains(UserRole.REVIEWER))
             {
@@ -42,6 +42,12 @@ public sealed class TaskStateMachine : ITaskStateMachine
     private static bool IsStudentWorkflow(TaskStatus targetStatus)
     {
         return targetStatus is TaskStatus.ACCEPTED or TaskStatus.IN_PROGRESS or TaskStatus.SUBMITTED_FOR_REVIEW;
+    }
+
+    private static bool IsReviewWorkflow(TaskStatus currentStatus, TaskStatus targetStatus)
+    {
+        return currentStatus is TaskStatus.SUBMITTED_FOR_REVIEW
+            && targetStatus is TaskStatus.COMPLETED or TaskStatus.IN_PROGRESS;
     }
 
     private static bool IsAllowedTransition(TaskStatus currentStatus, TaskStatus targetStatus)

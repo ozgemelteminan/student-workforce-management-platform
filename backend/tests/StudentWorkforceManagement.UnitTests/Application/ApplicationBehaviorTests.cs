@@ -26,7 +26,11 @@ public sealed class ApplicationBehaviorTests
         var stateMachine = new TaskStateMachine();
 
         stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.COMPLETED, [UserRole.REVIEWER], isAssignedStudent: false);
-        Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.COMPLETED, [UserRole.TASK_MANAGER], isAssignedStudent: false));
+        stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.COMPLETED, [UserRole.ADMIN], isAssignedStudent: false);
+        var taskManagerException = Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.COMPLETED, [UserRole.TASK_MANAGER], isAssignedStudent: false));
+        var studentException = Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.COMPLETED, [UserRole.STUDENT], isAssignedStudent: true));
+        Assert.Equal("Submission review requires ADMIN or REVIEWER authority.", taskManagerException.Message);
+        Assert.Equal("Submission review requires ADMIN or REVIEWER authority.", studentException.Message);
     }
 
     [Fact]
@@ -35,7 +39,21 @@ public sealed class ApplicationBehaviorTests
         var stateMachine = new TaskStateMachine();
 
         stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.REVIEWER], isAssignedStudent: false);
-        Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.TASK_MANAGER], isAssignedStudent: false));
+        stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.ADMIN], isAssignedStudent: false);
+        var taskManagerException = Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.TASK_MANAGER], isAssignedStudent: false));
+        var studentException = Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.SUBMITTED_FOR_REVIEW, TaskStatus.IN_PROGRESS, [UserRole.STUDENT], isAssignedStudent: true));
+        Assert.Equal("Submission review requires ADMIN or REVIEWER authority.", taskManagerException.Message);
+        Assert.Equal("Submission review requires ADMIN or REVIEWER authority.", studentException.Message);
+    }
+
+    [Fact]
+    public void Task_state_machine_keeps_student_workflow_assigned_student_guard()
+    {
+        var stateMachine = new TaskStateMachine();
+
+        var exception = Assert.Throws<ForbiddenException>(() => stateMachine.ValidateTransition(TaskStatus.ACCEPTED, TaskStatus.IN_PROGRESS, [UserRole.STUDENT], isAssignedStudent: false));
+
+        Assert.Equal("Only the assigned student may perform this task transition.", exception.Message);
     }
 
     [Fact]

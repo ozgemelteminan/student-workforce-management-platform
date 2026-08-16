@@ -8,6 +8,7 @@ using StudentWorkforceManagement.Application.Common.Services;
 using StudentWorkforceManagement.Application.Common.Storage;
 using StudentWorkforceManagement.Application.Common.Time;
 using StudentWorkforceManagement.Application.Files.Services;
+using StudentWorkforceManagement.Application.Availability.Commands;
 using StudentWorkforceManagement.Application.Collaboration.Commands;
 using StudentWorkforceManagement.Application.Collaboration.DTOs;
 using StudentWorkforceManagement.Application.Collaboration.Queries;
@@ -219,6 +220,53 @@ public sealed class ApplicationWorkflowTests
         Assert.Contains(context.Availability, item => item.Id == created.Id && item.Status == AvailabilityStatus.PREFERRED);
     }
 
+    [Theory]
+    [InlineData(AvailabilityStatus.AVAILABLE)]
+    [InlineData(AvailabilityStatus.UNAVAILABLE)]
+    [InlineData(AvailabilityStatus.PREFERRED)]
+    public async System.Threading.Tasks.Task Availability_accepts_all_supported_statuses(AvailabilityStatus status)
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var semester = SeedSemester(context);
+        await context.SaveChangesAsync();
+        var handler = new CreateAvailabilityCommandHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT));
+
+        var created = await handler.Handle(new CreateAvailabilityCommand(student.Id, semester.Id, DayOfWeek.Tuesday, new TimeOnly(13, 0), new TimeOnly(15, 0), status, "Status test"), CancellationToken.None);
+
+        Assert.Equal(status, created.Status);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Preferred_availability_can_be_updated_and_removed()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var semester = SeedSemester(context);
+        var availability = new Availability { Id = Guid.NewGuid(), StudentId = student.Id, SemesterId = semester.Id, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(13, 0), EndTime = new TimeOnly(15, 0), Status = AvailabilityStatus.PREFERRED, Reason = "Good time" };
+        context.Availability.Add(availability);
+        await context.SaveChangesAsync();
+        var handler = new AvailabilityCommandHandler(context, new FakeCurrentUser(student.UserId, student.Id, UserRole.STUDENT));
+
+        var updated = await handler.Handle(new UpdateAvailabilityCommand(availability.Id, DayOfWeek.Thursday, new TimeOnly(14, 0), new TimeOnly(16, 0), AvailabilityStatus.PREFERRED, "Better time"), CancellationToken.None);
+        await handler.Handle(new DeleteAvailabilityCommand(availability.Id), CancellationToken.None);
+
+        Assert.Equal(AvailabilityStatus.PREFERRED, updated.Status);
+        Assert.Equal("Better time", updated.Reason);
+        Assert.DoesNotContain(context.Availability, item => item.Id == availability.Id);
+    }
+
+    [Fact]
+    public void Availability_validator_rejects_invalid_time_range()
+    {
+        var validator = new CreateAvailabilityCommandValidator();
+
+        var result = validator.Validate(new CreateAvailabilityCommand(Guid.NewGuid(), Guid.NewGuid(), DayOfWeek.Friday, new TimeOnly(15, 0), new TimeOnly(13, 0), AvailabilityStatus.PREFERRED, null));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.ErrorMessage == "Availability end time must be after start time.");
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task Availability_rejects_real_overlap_with_conflict()
     {
@@ -348,6 +396,31 @@ public sealed class ApplicationWorkflowTests
         Assert.True(review.IsApproved);
         Assert.Equal(TaskStatus.COMPLETED, task.Status);
         Assert.Equal(SubmissionStatus.APPROVED, activeSubmission.Status);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Admin_can_approve_and_request_revision_for_eligible_submissions()
+    {
+        await using var context = CreateContext();
+        var student = SeedStudent(context);
+        var approvalTask = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.SUBMITTED_FOR_REVIEW);
+        var revisionTask = SeedTask(context, assignedStudentId: student.Id, status: TaskStatus.SUBMITTED_FOR_REVIEW);
+        var approvalSubmission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = approvalTask.Id, SubmittedById = student.Id, Status = SubmissionStatus.SUBMITTED_FOR_REVIEW, SubmittedAt = DateTimeOffset.UtcNow };
+        var revisionSubmission = new TaskSubmission { Id = Guid.NewGuid(), TaskId = revisionTask.Id, SubmittedById = student.Id, Status = SubmissionStatus.SUBMITTED_FOR_REVIEW, SubmittedAt = DateTimeOffset.UtcNow };
+        context.TaskSubmissions.AddRange(approvalSubmission, revisionSubmission);
+        await context.SaveChangesAsync();
+        var admin = new FakeCurrentUser(Guid.NewGuid(), null, UserRole.ADMIN);
+        var handler = new ReviewSubmissionCommandHandler(context, admin, new TaskStateMachine(), new AuditService(context, admin), new NoOpEventQueue(), new FakeClock());
+
+        var approval = await handler.Handle(new ApproveSubmissionCommand(approvalSubmission.Id, "Approved."), CancellationToken.None);
+        var revision = await handler.Handle(new RequestSubmissionRevisionCommand(revisionSubmission.Id, "Please revise."), CancellationToken.None);
+
+        Assert.True(approval.IsApproved);
+        Assert.False(revision.IsApproved);
+        Assert.Equal(TaskStatus.COMPLETED, approvalTask.Status);
+        Assert.Equal(SubmissionStatus.APPROVED, approvalSubmission.Status);
+        Assert.Equal(TaskStatus.IN_PROGRESS, revisionTask.Status);
+        Assert.Equal(SubmissionStatus.REVISION_REQUESTED, revisionSubmission.Status);
     }
 
     [Fact]
